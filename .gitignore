@@ -1,0 +1,10 @@
+# virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+
+# data files
+data/
+*.gdf
+*.mat

@@ -1,0 +1,90 @@
+import numpy as np
+import tensorflow as tf
+
+from pathlib import Path
+from EEGModels import EEGNet
+
+# epoch = trial aaaa
+
+MODEL_DIR = Path("eegnet")
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+def normalize_epochs(X_train, X_eval):
+    mean = X_train.mean(axis=(0, 2), keepdims=True)
+    std = X_train.std(axis=(0, 2), keepdims=True) + 1e-8
+
+    X_train_norm = (X_train - mean) / std
+    X_eval_norm = (X_eval - mean) / std
+
+    return X_train_norm, X_eval_norm
+
+
+def prepare_eegnet_input(X):
+    return X[..., np.newaxis]
+
+
+def get_eegnet_model_path(subject):
+    return MODEL_DIR / f"A{subject:02d}_eegnet.keras"
+
+
+def train_or_load_eegnet(subject, X_train, y_train):
+    model_path = get_eegnet_model_path(subject)
+
+    n_classes = 2
+    n_channels = X_train.shape[1]
+    n_samples = X_train.shape[2]
+
+    if model_path.exists():
+        print(f"Loading saved EEGNet model for A{subject:02d}")
+        model = tf.keras.models.load_model(model_path)
+        return model
+
+    print(f"Training EEGNet model for A{subject:02d}")
+
+    model = EEGNet(
+        nb_classes=n_classes,
+        Chans=n_channels,
+        Samples=n_samples,
+        dropoutRate=0.5, # to avoid overfitting, paper, within subject
+        kernLength=125, # paper ( allows for capturing frequency information at 2 Hz), sampled with 250Hz (desc data) / 2 =  125
+        F1=8, # paper eegnet-8,2
+        D=2,
+        F2=16, # 8*2 paper
+        dropoutType="Dropout"
+    )
+
+    model.compile(
+        loss="categorical_crossentropy", #paper
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), # paper adam
+        metrics=["accuracy"]
+    )
+
+    early_stopping = tf.keras.callbacks.EarlyStopping(
+        monitor="val_loss",
+        patience=20,# logic it says, some rule to avoid stopping too early because of small random
+        restore_best_weights=True
+    )
+    
+    y_train_cat = tf.keras.utils.to_categorical(y_train, num_classes=n_classes) # into categorical/vectors
+    
+    model.fit(
+        X_train,
+        y_train_cat,
+        epochs=500, # looks at the whole training dataset n times, paper
+        batch_size=16, # se separa en grupos peques, 144 training trials/16=9 batches
+        validation_split=0.2,
+        callbacks=[early_stopping],
+        verbose=0
+    )
+
+    model.save(model_path)
+    print(f"Saved EEGNet model for A{subject:02d} at {model_path}")
+
+    return model
+
+
+def predict_eegnet(model, X_eval):
+    probabilities = model.predict(X_eval, verbose=0)
+    y_pred = np.argmax(probabilities, axis=1)
+
+    return y_pred

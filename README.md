@@ -3,5 +3,6 @@ deactivate
 
 pip install -r requirements.txt
 
-python src/code.py
+python src/main.py
+python src/main_eegnet.py
 

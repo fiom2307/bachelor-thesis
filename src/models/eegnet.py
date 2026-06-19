@@ -1,30 +1,13 @@
 import numpy as np
 import tensorflow as tf
 
-from pathlib import Path
-from EEGModels import EEGNet
+from src.models.EEGModels import EEGNet
+from src.utils.paths import EEGNET_MODEL_DIR
 
-# epoch = trial aaaa
-
-MODEL_DIR = Path("eegnet")
-MODEL_DIR.mkdir(parents=True, exist_ok=True)
-
-def normalize_epochs(X_train, X_eval):
-    mean = X_train.mean(axis=(0, 2), keepdims=True)
-    std = X_train.std(axis=(0, 2), keepdims=True) + 1e-8
-
-    X_train_norm = (X_train - mean) / std
-    X_eval_norm = (X_eval - mean) / std
-
-    return X_train_norm, X_eval_norm
-
-
-def prepare_eegnet_input(X):
-    return X[..., np.newaxis]
-
+# epoch = trial aaaa (not in eegnet context)
 
 def get_eegnet_model_path(subject):
-    return MODEL_DIR / f"A{subject:02d}_eegnet.keras"
+    return EEGNET_MODEL_DIR / f"A{subject:02d}_eegnet.keras"
 
 
 def train_or_load_eegnet(subject, X_train, y_train):

@@ -10,18 +10,15 @@ def save_accuracy_comparison(results, output_file=ACCURACY_COMPARISON_FILE):
         writer.writerow([
             "subject",
             "csp_lda_accuracy",
-            "eegnet_accuracy",
-            "difference_eegnet_minus_csp_lda",
+            "eegnet_accuracy"
         ])
 
         for subject_name, csp_acc, eegnet_acc in results:
-            difference = eegnet_acc - csp_acc
 
             writer.writerow([
                 subject_name,
                 csp_acc,
-                eegnet_acc,
-                difference,
+                eegnet_acc
             ])
 
     return output_file

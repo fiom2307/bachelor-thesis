@@ -45,8 +45,8 @@ def create_epochs(raw_eeg, events, event_id_used):
         raw_eeg,
         events,
         event_id=event_id_used,
-        tmin=0,
-        tmax=4,
+        tmin=0.5, # was 0 before
+        tmax=2.5, #was 4 before
         baseline=None,
         preload=True,
         verbose=False

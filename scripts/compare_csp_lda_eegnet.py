@@ -1,5 +1,5 @@
-from pipelines.csp_lda_pipeline import run_csp_lda_for_subject
-from pipelines.eegnet_pipeline import run_eegnet_for_subject
+from src.pipelines.csp_lda_pipeline import run_csp_lda_for_subject
+from src.pipelines.eegnet_pipeline import run_eegnet_for_subject
 from src.utils.results import save_accuracy_comparison, load_accuracy_comparison
 from src.data.dataset import get_data_for_subject
 
@@ -60,7 +60,8 @@ def main():
         return
 
     results = run_experiment()
-    output_file = save_accuracy_comparison(results)
+    
+    save_accuracy_comparison(results)
 
     print_results(results)
 

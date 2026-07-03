@@ -14,8 +14,6 @@ from src.data.preprocessing import (
     prepare_eegnet_input
 )
 
-from src.data.dataset import get_data_for_subject
-
 def run_eegnet_for_subject(subj, data):
 
     X_train, y_train, X_eval, y_eval = data

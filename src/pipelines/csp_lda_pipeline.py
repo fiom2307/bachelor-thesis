@@ -1,6 +1,5 @@
 from sklearn.metrics import accuracy_score
 
-from src.data.dataset import get_data_for_subject
 from src.models.csp_lda import (
     train_or_load_csp_lda,
     predict_csp_lda

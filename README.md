@@ -1,7 +1,37 @@
+## Setup
+
+This project was developed using:
+
+```text
+Python 3.12.4
+```
+
+Create a virtual environment:
+
+```powershell
+python -m venv .venv
+```
+
+Activate the virtual environment:
+
+```powershell
 .\.venv\Scripts\Activate.ps1
-deactivate
+```
 
+Install the required dependencies:
+
+```powershell
 pip install -r requirements.txt
+```
 
+Run the model comparison:
+
+```powershell
 python -m scripts.compare_csp_lda_eegnet
+```
 
+Deactivate the virtual environment:
+
+```powershell
+deactivate
+```

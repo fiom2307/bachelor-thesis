@@ -1,15 +1,22 @@
-# virtual environment
+# Virtual environment
 .venv/
 
 # Python cache
 __pycache__/
 *.pyc
 
-# data files
+# Data files
 /data/
 *.gdf
 *.mat
 
+# Generated results
 /results/
 
+# Saved trained models
 /models/
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/

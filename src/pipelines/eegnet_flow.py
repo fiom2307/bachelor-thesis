@@ -1,10 +1,8 @@
-from sklearn.metrics import accuracy_score
+import shap
+import numpy as np
+import matplotlib.pyplot as plt
 
-from src.data.data_loader import (
-    load_epochs, 
-    load_left_right_true_labels,
-    get_subject_files
-)
+from sklearn.metrics import accuracy_score
 
 from src.models.eegnet import (
     train_or_load_eegnet,
@@ -16,35 +14,9 @@ from src.data.preprocessing import (
     prepare_eegnet_input
 )
 
+from src.data.dataset import get_data_for_subject
 
-def get_eegnet_for_subject(subject: int):
-    files = get_subject_files(subject)
-
-    if files is None:
-        return None
-
-    train_file, eval_file, mat_file = files
-
-    X_train, y_train = load_epochs(train_file, None)
-
-    if X_train is None:
-        return None
-
-    X_eval, _ = load_epochs(eval_file, mat_file)
-
-    if X_eval is None:
-        return None
-
-    y_eval = load_left_right_true_labels(mat_file)
-
-    return X_train, y_train, X_eval, y_eval
-
-def run_eegnet_for_subject(subj):
-
-    data = get_eegnet_for_subject(subj)
-
-    if data is None:
-        return None
+def run_eegnet_for_subject(subj, data):
 
     X_train, y_train, X_eval, y_eval = data
 
@@ -58,6 +30,64 @@ def run_eegnet_for_subject(subj):
         X_train,
         y_train,
     )
+
+    # rng = np.random.default_rng(42)
+    # background_idx = rng.choice(len(X_train), size=50, replace=False)
+
+    # background = X_train[background_idx].astype(np.float32)
+
+    # -------- choose class to explain --------
+    # class_index = 0  # 0 = left hand, 1 = right hand
+    # class_name = "Left hand"
+
+    # Predict labels for evaluation trials
+    # y_pred_probs = model.predict(X_eval)
+    # y_pred = np.argmax(y_pred_probs, axis=1)
+
+    # Use only correctly classified trials of the selected class
+    # correct_class_mask = (y_eval == class_index) & (y_pred == class_index)
+
+    # X_explain = X_eval[correct_class_mask].astype(np.float32)
+
+    # print(f"Correct {class_name} trials:", X_explain.shape)
+
+    # -------- compute SHAP --------
+    # explainer = shap.GradientExplainer(model, background)
+
+    # shap_values = explainer.shap_values(X_explain)
+
+    # print("SHAP computed")
+    # print(type(shap_values))
+    # print("shap_values shape:", shap_values.shape)
+
+    # Take SHAP values for the selected output class
+    # sv = shap_values[..., class_index]
+
+    # print("sv shape before squeeze:", sv.shape)
+
+    # sv = sv.squeeze(-1)
+
+    # print("sv shape after squeeze:", sv.shape)
+
+    # channel_names = [
+    #     "Fz",
+    #     "FC3", "FC1", "FCz", "FC2", "FC4",
+    #     "C5", "C3", "C1", "Cz", "C2", "C4", "C6",
+    #     "CP3", "CP1", "CPz", "CP2", "CP4",
+    #     "P1", "Pz", "P2", "POz"
+    # ]
+
+    # channel_importance = np.mean(np.abs(sv), axis=(0, 2))
+
+    # print("channel_importance shape:", channel_importance.shape)
+
+    # plt.figure(figsize=(10, 4))
+    # plt.bar(channel_names, channel_importance)
+    # plt.xticks(rotation=90)
+    # plt.ylabel("Mean absolute SHAP value")
+    # plt.title(f"EEGNet SHAP Channel Importance - Correct {class_name}")
+    # plt.tight_layout()
+    # plt.show()
 
     y_pred = predict_eegnet(model, X_eval)
 

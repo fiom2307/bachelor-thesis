@@ -13,7 +13,7 @@ def get_lda_model_path(subject: int):
     return CSP_LDA_MODEL_DIR / f"A{subject:02d}_lda.joblib"
 
 
-def train_csp_lda_pipeline(X_train, y_train):
+def train_csp_lda(X_train, y_train):
     csp = fit_csp(X_train, y_train)
 
     X_train_csp = apply_csp(csp, X_train)
@@ -23,7 +23,7 @@ def train_csp_lda_pipeline(X_train, y_train):
     return csp, lda
 
 
-def predict_csp_lda_pipeline(csp, lda, X_eval):
+def predict_csp_lda(csp, lda, X_eval):
     X_eval_csp = apply_csp(csp, X_eval)
 
     y_pred = predict_lda(lda, X_eval_csp)
@@ -38,10 +38,8 @@ def save_csp_lda_models(subject: int, csp, lda):
     joblib.dump(csp, csp_path)
     joblib.dump(lda, lda_path)
 
-    print(f"Saved CSP+LDA models for A{subject:02d}")
 
-
-def load_csp_lda_models(subject: int):
+def load_csp_lda_models(subject):
     csp_path = get_csp_model_path(subject)
     lda_path = get_lda_model_path(subject)
 
@@ -51,6 +49,25 @@ def load_csp_lda_models(subject: int):
     csp = joblib.load(csp_path)
     lda = joblib.load(lda_path)
 
-    print(f"Loaded saved CSP+LDA models for A{subject:02d}")
-
     return csp, lda
+
+def train_or_load_csp_lda(subject, X_train, y_train):
+    
+    saved_models = load_csp_lda_models(subject)
+    force_retrain = False
+
+    if saved_models is not None and not force_retrain:
+        return saved_models
+    
+    csp, lda = train_csp_lda(
+        X_train,
+        y_train
+    )
+
+    save_csp_lda_models(
+        subject,
+        csp,
+        lda
+    )
+    return csp, lda
+

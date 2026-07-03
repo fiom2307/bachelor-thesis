@@ -8,7 +8,14 @@ def pick_eeg_channels(raw):
 
 def apply_bandpass_filter(raw_eeg):
     # Apply a band-pass filter from 8 Hz to 30 Hz
-    raw_eeg.filter(l_freq=8, h_freq=30, verbose=False)
+    raw_eeg.filter(
+        l_freq=8,
+        h_freq=30,
+        method="iir",
+        iir_params=dict(order=4, ftype="butter"),
+        phase="zero",
+        verbose=False
+    )
 
 def extract_events(raw):
     # events: [sample_position = 98241, previous_value = 0, event_code = 7]
@@ -46,7 +53,7 @@ def create_epochs(raw_eeg, events, event_id_used):
         events,
         event_id=event_id_used,
         tmin=0.5, # was 0 before
-        tmax=2.5, #was 4 before
+        tmax=4, #was 4 before
         baseline=None,
         preload=True,
         verbose=False
@@ -55,7 +62,7 @@ def create_epochs(raw_eeg, events, event_id_used):
     return epochs
 
 def get_epochs_data(epochs):
-    # (n_trials = 144, 22, n_times = 1001 -> 4s = 1000)
+    # (n_trials = 144, 22, n_times = 1001 -> 4s = 1000) # ya no es asi
     return epochs.get_data()
 
 def normalize_epochs(X_train, X_eval):

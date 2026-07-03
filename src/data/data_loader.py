@@ -24,7 +24,6 @@ def get_subject_files(subj: int):
     mat_file = DATA_DIR / f"A0{subj}E.mat"
 
     if not (train_file.exists() and eval_file.exists() and mat_file.exists()):
-        print(f"Subject {subj} does not exist or files are missing")
         return None
 
     return train_file, eval_file, mat_file

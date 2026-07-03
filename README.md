@@ -3,7 +3,5 @@ deactivate
 
 pip install -r requirements.txt
 
-python -m scripts.run_csp_lda
-python -m scripts.run_eegnet
-python -m scripts.run_csp_lda_eegnet
+python -m scripts.compare_csp_lda_eegnet
 

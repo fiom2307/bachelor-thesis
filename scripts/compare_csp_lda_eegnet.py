@@ -2,6 +2,7 @@ from src.pipelines.csp_lda_pipeline import run_csp_lda_for_subject
 from src.pipelines.eegnet_pipeline import run_eegnet_for_subject
 from src.utils.results import save_accuracy_comparison, load_accuracy_comparison
 from src.data.dataset import get_data_for_subject
+from src.data.preprocessing import apply_car
 
 def print_results(results):
     print("-" * 70)
@@ -45,8 +46,15 @@ def run_experiment():
             print(f"Skipping {subject_name}: data not found")
             continue
 
-        csp_acc = run_csp_lda_for_subject(subj, data)
-        eegnet_acc = run_eegnet_for_subject(subj, data)
+        X_train, y_train, X_eval, y_eval = data
+
+        X_train = apply_car(X_train)
+        X_eval = apply_car(X_eval)
+
+        data_car = X_train, y_train, X_eval, y_eval
+
+        csp_acc = run_csp_lda_for_subject(subj, data_car)
+        eegnet_acc = run_eegnet_for_subject(subj, data_car)
 
         results.append((subject_name, csp_acc, eegnet_acc))
 

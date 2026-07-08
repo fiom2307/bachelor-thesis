@@ -17,6 +17,9 @@ def apply_bandpass_filter(raw_eeg):
         verbose=False
     )
 
+def apply_car(X):
+    return X - X.mean(axis=1, keepdims=True)
+
 def extract_events(raw):
     # events: [sample_position = 98241, previous_value = 0, event_code = 7]
     # event_id: {"769": 7, "770": 8, ...}

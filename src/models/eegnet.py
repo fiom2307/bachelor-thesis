@@ -55,49 +55,65 @@ def train_or_load_eegnet(subject, X_train, y_train):
 
     model_path = get_eegnet_model_path(subject)
 
-    if model_path.exists():
-        model = tf.keras.models.load_model(model_path)
-        return model
-
     n_classes = 2
     n_channels = X_train.shape[1]
     n_samples = X_train.shape[2]
 
-    X_tr, X_val, y_tr, y_val = train_test_split(
-        X_train,
-        y_train,
-        test_size=0.2,
-        stratify=y_train,
+    n_folds = 5
+
+    skf = StratifiedKFold(
+        n_splits=n_folds,
+        shuffle=True,
         random_state=seed
     )
 
-    y_tr_cat = tf.keras.utils.to_categorical(y_tr, num_classes=n_classes)
-    y_val_cat = tf.keras.utils.to_categorical(y_val, num_classes=n_classes)
+    models = []
 
-    model = create_eegnet_model(
-        n_classes,
-        n_channels,
-        n_samples
-    )
+    for fold, (train_idx, val_idx) in enumerate(skf.split(X_train, y_train), start=1):
+        model_path = get_eegnet_fold_model_path(subject, fold, base_seed)
 
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor="val_loss",
-        patience=20,
-        restore_best_weights=True
-    )
+        if model_path.exists():
+            model = tf.keras.models.load_model(model_path)
+            models.append(model)
+            continue
 
-    model.fit(
-        X_tr,
-        y_tr_cat,
-        epochs=500,
-        batch_size=16,
-        validation_data=(X_val, y_val_cat),
-        callbacks=[early_stopping],
-        verbose=0
-    )
+        print(f"Training A{subject:02d} EEGNet fold {fold}/{n_folds}")
 
-    model.save(model_path)
+        set_seed(seed + fold)
 
+        X_tr = X_train[train_idx]
+        X_val = X_train[val_idx]
+        y_tr = y_train[train_idx]
+        y_val = y_train[val_idx]
+
+        y_tr_cat = tf.keras.utils.to_categorical(y_tr, num_classes=n_classes)
+        y_val_cat = tf.keras.utils.to_categorical(y_val, num_classes=n_classes)
+
+        model = create_eegnet_model(
+            n_classes,
+            n_channels,
+            n_samples
+        )
+
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=20,
+            restore_best_weights=True
+        )
+
+        model.fit(
+            X_tr,
+            y_tr_cat,
+            epochs=500,
+            batch_size=16,
+            validation_data=(X_val, y_val_cat),
+            callbacks=[early_stopping],
+            verbose=0
+        )
+
+        model.save(model_path)
+
+        models.append(model)
 
     # y_train_cat = tf.keras.utils.to_categorical(y_train, num_classes=n_classes) # into categorical/vectors
     
@@ -111,11 +127,10 @@ def train_or_load_eegnet(subject, X_train, y_train):
     #     verbose=0
     # )
 
-    return model
+    return models
 
 
 def predict_eegnet(models, X_eval):
-#to change later
     if not isinstance(models, list):
         models = [models]
 

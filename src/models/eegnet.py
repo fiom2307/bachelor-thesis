@@ -97,7 +97,7 @@ def train_or_load_eegnet(subject, X_train, y_train):
 
         early_stopping = tf.keras.callbacks.EarlyStopping(
             monitor="val_loss",
-            patience=20,
+            patience=50,
             restore_best_weights=True
         )
 

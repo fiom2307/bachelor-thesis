@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from src.models.EEGModels import EEGNet
 from src.utils.paths import get_eegnet_fold_model_path
+from src.utils.config import BASE_SEED
 
 from sklearn.model_selection import StratifiedKFold
 
@@ -39,8 +40,7 @@ def create_eegnet_model(n_classes, n_channels, n_samples):
 
 
 def train_or_load_eegnet(subject, X_train, y_train):
-    base_seed = 42
-    seed = base_seed + subject
+    seed = BASE_SEED + subject
     set_seed(seed)
 
     n_classes = 2
@@ -58,7 +58,7 @@ def train_or_load_eegnet(subject, X_train, y_train):
     models = []
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(X_train, y_train), start=1):
-        model_path = get_eegnet_fold_model_path(subject, fold, base_seed)
+        model_path = get_eegnet_fold_model_path(subject, fold)
 
         if model_path.exists():
             model = tf.keras.models.load_model(model_path)

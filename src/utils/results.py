@@ -1,9 +1,9 @@
 import csv
 
-from src.utils.paths import ACCURACY_COMPARISON_FILE
+from src.utils.paths import get_results_accuracy_comparison_path
 
 
-def save_accuracy_comparison(results, output_file=ACCURACY_COMPARISON_FILE):
+def save_accuracy_comparison(results, output_file=get_results_accuracy_comparison_path()):
     with open(output_file, "w", newline="") as f:
         writer = csv.writer(f)
 
@@ -24,7 +24,7 @@ def save_accuracy_comparison(results, output_file=ACCURACY_COMPARISON_FILE):
     return output_file
 
 
-def load_accuracy_comparison(input_file=ACCURACY_COMPARISON_FILE):
+def load_accuracy_comparison(input_file=get_results_accuracy_comparison_path()):
     if not input_file.exists():
         return None
 

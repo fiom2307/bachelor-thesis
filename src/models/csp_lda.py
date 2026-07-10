@@ -4,6 +4,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from src.models.csp import fit_csp, apply_csp
 from src.models.lda import train_lda, predict_lda
+from src.utils.config import BASE_SEED
 
 from src.utils.paths import (
     get_csp_fold_model_path,
@@ -35,17 +36,17 @@ def predict_proba_csp_lda(csp, lda, X_eval):
     return y_proba
 
 
-def save_csp_lda_fold_models(subject: int, fold: int, base_seed: int, csp, lda):
-    csp_path = get_csp_fold_model_path(subject, fold, base_seed)
-    lda_path = get_lda_fold_model_path(subject, fold, base_seed)
+def save_csp_lda_fold_models(subject: int, fold: int, csp, lda):
+    csp_path = get_csp_fold_model_path(subject, fold)
+    lda_path = get_lda_fold_model_path(subject, fold)
 
     joblib.dump(csp, csp_path)
     joblib.dump(lda, lda_path)
 
 
-def load_csp_lda_fold_models(subject: int, fold: int, base_seed: int):
-    csp_path = get_csp_fold_model_path(subject, fold, base_seed)
-    lda_path = get_lda_fold_model_path(subject, fold, base_seed)
+def load_csp_lda_fold_models(subject: int, fold: int):
+    csp_path = get_csp_fold_model_path(subject, fold)
+    lda_path = get_lda_fold_model_path(subject, fold)
 
     if not (csp_path.exists() and lda_path.exists()):
         return None
@@ -56,8 +57,7 @@ def load_csp_lda_fold_models(subject: int, fold: int, base_seed: int):
     return csp, lda
 
 def train_or_load_csp_lda(subject, X_train, y_train):
-    base_seed = 42
-    seed = base_seed + subject  # mismo seed que EEGNet -> mismos folds exactos
+    seed = BASE_SEED + subject  # mismo seed que EEGNet -> mismos folds exactos
 
     n_folds = 5
 
@@ -67,10 +67,10 @@ def train_or_load_csp_lda(subject, X_train, y_train):
         random_state=seed
     )
 
-    models = []  # lista de tuplas (csp, lda)
+    models = []
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(X_train, y_train), start=1):
-        saved_models = load_csp_lda_fold_models(subject, fold, base_seed)
+        saved_models = load_csp_lda_fold_models(subject, fold)
 
         if saved_models is not None:
             models.append(saved_models)
@@ -80,12 +80,10 @@ def train_or_load_csp_lda(subject, X_train, y_train):
 
         X_tr = X_train[train_idx]
         y_tr = y_train[train_idx]
-        # val_idx (20%) queda sin usar para el fit, igual que en EEGNet
-        # ahí solo se usa para early stopping, acá LDA no lo necesita
 
         csp, lda = train_csp_lda(X_tr, y_tr)
 
-        save_csp_lda_fold_models(subject, fold, base_seed, csp, lda)
+        save_csp_lda_fold_models(subject, fold, csp, lda)
 
         models.append((csp, lda))
 

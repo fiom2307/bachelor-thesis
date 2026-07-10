@@ -1,7 +1,10 @@
 from src.data.data_loader import (
-    get_subject_files,
     load_epochs,
     load_left_right_true_labels,
+)
+
+from src.utils.paths import (
+    get_subject_files
 )
 
 

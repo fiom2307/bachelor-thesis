@@ -2,14 +2,10 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from sklearn.model_selection import train_test_split
-
 from src.models.EEGModels import EEGNet
-from src.utils.paths import EEGNET_MODEL_DIR
+from src.utils.paths import get_eegnet_fold_model_path
 
 from sklearn.model_selection import StratifiedKFold
-
-# epoch = trial aaaa (not in eegnet context)
 
 def set_seed(seed):
     random.seed(seed)
@@ -20,9 +16,6 @@ def set_seed(seed):
         tf.config.experimental.enable_op_determinism()
     except Exception:
         pass
-
-def get_eegnet_model_path(subject):
-    return EEGNET_MODEL_DIR / f"A{subject:02d}_eegnet.keras"
 
 def create_eegnet_model(n_classes, n_channels, n_samples):
     model = EEGNet(
@@ -44,16 +37,11 @@ def create_eegnet_model(n_classes, n_channels, n_samples):
     )
     return model
 
-def get_eegnet_fold_model_path(subject, fold, base_seed):
-    return EEGNET_MODEL_DIR / f"A{subject:02d}_eegnet_kfold_seed{base_seed}_fold{fold}.keras"
-
 
 def train_or_load_eegnet(subject, X_train, y_train):
     base_seed = 42
     seed = base_seed + subject
     set_seed(seed)
-
-    model_path = get_eegnet_model_path(subject)
 
     n_classes = 2
     n_channels = X_train.shape[1]
@@ -114,18 +102,6 @@ def train_or_load_eegnet(subject, X_train, y_train):
         model.save(model_path)
 
         models.append(model)
-
-    # y_train_cat = tf.keras.utils.to_categorical(y_train, num_classes=n_classes) # into categorical/vectors
-    
-    # model.fit(
-    #     X_train,
-    #     y_train_cat,
-    #     epochs=500, # looks at the whole training dataset n times, paper
-    #     batch_size=16, # se separa en grupos peques, 144 training trials/16=9 batches
-    #     validation_split=0.2,
-    #     callbacks=[early_stopping],
-    #     verbose=0
-    # )
 
     return models
 

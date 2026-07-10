@@ -4,16 +4,11 @@ from sklearn.model_selection import StratifiedKFold
 
 from src.models.csp import fit_csp, apply_csp
 from src.models.lda import train_lda, predict_lda
-from src.utils.paths import CSP_LDA_MODEL_DIR
 
-
-def get_csp_fold_model_path(subject: int, fold: int, base_seed: int):
-    return CSP_LDA_MODEL_DIR / f"A{subject:02d}_csp_kfold_seed{base_seed}_fold{fold}.joblib"
-
-
-def get_lda_fold_model_path(subject: int, fold: int, base_seed: int):
-    return CSP_LDA_MODEL_DIR / f"A{subject:02d}_lda_kfold_seed{base_seed}_fold{fold}.joblib"
-
+from src.utils.paths import (
+    get_csp_fold_model_path,
+    get_lda_fold_model_path
+)
 
 def train_csp_lda(X_train, y_train):
     csp = fit_csp(X_train, y_train)

@@ -2,7 +2,10 @@ from pathlib import Path
 from scipy.io import loadmat
 import mne
 
-from src.utils.paths import DATA_DIR
+from src.utils.paths import (
+    is_eval_file
+)
+
 from src.data.utils import (
     to_binary_left_right,
     get_left_right_mask,
@@ -18,26 +21,11 @@ from src.data.preprocessing import (
     get_epochs_data
 )
 
-def get_subject_files(subj: int):
-    train_file  = DATA_DIR / f"A0{subj}T.gdf"
-    eval_file  = DATA_DIR / f"A0{subj}E.gdf"
-    mat_file = DATA_DIR / f"A0{subj}E.mat"
-
-    if not (train_file.exists() and eval_file.exists() and mat_file.exists()):
-        return None
-
-    return train_file, eval_file, mat_file
-
 def load_raw_gdf(file_path: Path):
     file_path = Path(file_path)
     raw = mne.io.read_raw_gdf(file_path, preload=True, verbose=False)
 
     return raw
-
-def is_eval_file(file_path: Path):
-    file_stem = file_path.stem
-    session = file_stem[3]
-    return session.upper() == "E"
 
 def load_true_labels_full(mat_path: Path):
     mat_path = Path(mat_path)

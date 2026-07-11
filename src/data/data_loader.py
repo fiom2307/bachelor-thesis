@@ -25,7 +25,7 @@ def load_raw_gdf(file_path: Path):
 
     return raw
 
-def load_true_labels_full(mat_path: Path):
+def load_true_labels(mat_path: Path):
     mat_path = Path(mat_path)
     labels = loadmat(mat_path)["classlabel"].flatten()
 
@@ -70,12 +70,7 @@ def load_epochs(file_path: Path, mat_path: Path):
     X = get_epochs_data(epochs)
 
     if is_eval:
-        if mat_path is None:
-            raise ValueError(
-                "mat_path is required for an evaluation GDF file."
-            )
-
-        y = load_true_labels_full(mat_path)
+        y = load_true_labels(mat_path)
     else:
         y = get_train_labels(epochs)
 

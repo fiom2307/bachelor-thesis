@@ -2,7 +2,7 @@ from sklearn.metrics import accuracy_score
 
 from src.models.csp_lda import (
     train_or_load_csp_lda,
-    predict_csp_lda_ensemble
+    predict_csp_lda
 )
 
 
@@ -16,7 +16,7 @@ def run_csp_lda_for_subject(subject: int, data):
         y_train
     )
 
-    y_pred = predict_csp_lda_ensemble(
+    y_pred = predict_csp_lda(
         models,
         X_eval
     )

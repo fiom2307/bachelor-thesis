@@ -20,14 +20,6 @@ def train_csp_lda(X_train, y_train):
 
     return csp, lda
 
-
-def predict_csp_lda(csp, lda, X_eval):
-    X_eval_csp = apply_csp(csp, X_eval)
-
-    y_pred = predict_lda(lda, X_eval_csp)
-
-    return y_pred
-
 def predict_proba_csp_lda(csp, lda, X_eval):
     X_eval_csp = apply_csp(csp, X_eval)
 
@@ -57,7 +49,7 @@ def load_csp_lda_fold_models(subject: int, fold: int):
     return csp, lda
 
 def train_or_load_csp_lda(subject, X_train, y_train):
-    seed = BASE_SEED + subject  # mismo seed que EEGNet -> mismos folds exactos
+    seed = BASE_SEED + subject
 
     n_folds = 5
 
@@ -89,7 +81,7 @@ def train_or_load_csp_lda(subject, X_train, y_train):
 
     return models
 
-def predict_csp_lda_ensemble(models, X_eval):
+def predict_csp_lda(models, X_eval):
     probabilities = []
 
     for csp, lda in models:

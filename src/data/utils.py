@@ -1,21 +1,22 @@
 import numpy as np
 
-def get_left_right_mask(labels):
-    return (labels == 1) | (labels == 2)
+def get_train_labels(epochs):
+    class_to_label = {
+        "left_hand": 0,
+        "right_hand": 1,
+        "feet": 2,
+        "tongue": 3,
+    }
 
-def to_binary_left_right(labels, zero_label):
-    return np.where(labels == zero_label, 0, 1)
+    event_code_to_label = {
+        epochs.event_id[class_name]: label
+        for class_name, label in class_to_label.items()
+    }
 
-def filter_left_right_epochs(y_true_full, epochs_data):
-    mask_lr = get_left_right_mask(y_true_full)
-
-    X_lr = epochs_data[mask_lr]
-
-    return X_lr
-
-def get_train_left_right_labels(epochs, left_event_id):
-    # (144,)
-    y = epochs.events[:, -1]
-    y_binary = to_binary_left_right(y, left_event_id)
-
-    return y_binary
+    return np.array(
+        [
+            event_code_to_label[event_code]
+            for event_code in epochs.events[:, -1]
+        ],
+        dtype=np.int64,
+    )

@@ -43,7 +43,7 @@ def train_or_load_eegnet(subject, X_train, y_train):
     seed = BASE_SEED + subject
     set_seed(seed)
 
-    n_classes = 2
+    n_classes = 4
     n_channels = X_train.shape[1]
     n_samples = X_train.shape[2]
 

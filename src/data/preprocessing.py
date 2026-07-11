@@ -36,13 +36,26 @@ def get_event_ids_for_session(event_id, is_eval):
             "unknown_cue": event_id["783"]
         }
 
-    if "769" not in event_id or "770" not in event_id:
-        print(f"No cue events 769/770 found")
+    required_events = {
+        "left_hand": "769",
+        "right_hand": "770",
+        "feet": "771",
+        "tongue": "772",
+    }
+
+    missing_events = [
+        event_code
+        for event_code in required_events.values()
+        if event_code not in event_id
+    ]
+
+    if missing_events:
+        print(f"Missing training cue events: {', '.join(missing_events)}")
         return None
 
     return {
-        "left_hand": event_id["769"],
-        "right_hand": event_id["770"],
+        class_name: event_id[event_code]
+        for class_name, event_code in required_events.items()
     }
 
 def create_epochs(raw_eeg, events, event_id_used):

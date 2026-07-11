@@ -1,6 +1,5 @@
 from src.data.data_loader import (
-    load_epochs,
-    load_left_right_true_labels,
+    load_epochs
 )
 
 from src.utils.paths import (
@@ -21,11 +20,9 @@ def get_data_for_subject(subject: int):
     if X_train is None:
         return None
 
-    X_eval, _ = load_epochs(eval_file, mat_file)
+    X_eval, y_eval = load_epochs(eval_file, mat_file)
 
     if X_eval is None:
         return None
-
-    y_eval = load_left_right_true_labels(mat_file)
 
     return X_train, y_train, X_eval, y_eval

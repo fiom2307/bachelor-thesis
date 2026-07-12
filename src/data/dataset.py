@@ -1,13 +1,20 @@
-from src.data.data_loader import (
-    load_epochs
-)
+import numpy as np
 
-from src.utils.paths import (
-    get_subject_files
-)
+from src.data.data_loader import load_epochs
+from src.utils.paths import get_subject_files
 
 
-def get_data_for_subject(subject: int):
+def get_data_for_subject(subject: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    """
+    Load the training and evaluation data for one subject.
+
+    Training labels are obtained from the GDF event annotations, while
+    evaluation labels are loaded from the corresponding MATLAB file.
+
+    Returns:
+        A tuple containing X_train, y_train, X_eval, and y_eval.
+        Returns None if the subject files or required EEG epochs are unavailable.
+    """
     files = get_subject_files(subject)
 
     if files is None:

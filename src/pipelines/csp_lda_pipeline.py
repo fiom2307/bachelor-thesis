@@ -16,7 +16,7 @@ def run_csp_lda_for_subject(
         np.ndarray,
     ],
 ) -> float:
-    """Train or load CSP+LDA and evaluate it for one subject."""
+    """Train or load CSP+LDA and return its accuracy and predictions."""
     X_train, y_train, X_eval, y_eval = data
 
     models = train_or_load_csp_lda(
@@ -30,4 +30,6 @@ def run_csp_lda_for_subject(
         X_eval,
     )
 
-    return float(accuracy_score(y_eval, y_pred))
+    accuracy = float(accuracy_score(y_eval, y_pred))
+
+    return accuracy, y_pred

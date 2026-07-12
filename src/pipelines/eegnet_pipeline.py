@@ -22,7 +22,7 @@ def run_eegnet_for_subject(
         np.ndarray,
     ],
 ) -> float:
-    """Train or load the EEGNet ensemble and evaluate it for one subject."""
+    """Train or load the EEGNet ensemble and return its accuracy and predictions."""
     X_train, y_train, X_eval, y_eval = data
 
     X_train, X_eval = normalize_epochs(
@@ -102,4 +102,5 @@ def run_eegnet_for_subject(
         X_eval,
     )
 
-    return float(accuracy_score(y_eval, y_pred))
+    accuracy = float(accuracy_score(y_eval, y_pred))
+    return accuracy, y_pred

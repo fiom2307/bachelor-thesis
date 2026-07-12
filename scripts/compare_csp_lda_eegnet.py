@@ -53,8 +53,8 @@ def run_experiment():
 
         data_car = X_train, y_train, X_eval, y_eval
 
-        csp_acc = run_csp_lda_for_subject(subj, data_car)
-        eegnet_acc = run_eegnet_for_subject(subj, data_car)
+        csp_acc, _ = run_csp_lda_for_subject(subj, data_car)
+        eegnet_acc, _ = run_eegnet_for_subject(subj, data_car)
 
         results.append((subject_name, csp_acc, eegnet_acc))
 

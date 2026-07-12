@@ -13,12 +13,14 @@ RESULTS_DIR = ROOT_DIR / "results"
 EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
+CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 
 
 # Create output directories
 EEGNET_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 CSP_LDA_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 ACCURACY_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+CONFUSION_MATRIX_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_subject_name(subject: int) -> str:
@@ -126,4 +128,10 @@ def get_results_accuracy_comparison_path() -> Path:
     return (
         ACCURACY_RESULTS_DIR
         / f"seed_{BASE_SEED}_csp_lda_vs_eegnet.csv"
+    )
+
+def get_all_confusion_matrices_path():
+    return (
+        CONFUSION_MATRIX_RESULTS_DIR
+        / f"seed_{BASE_SEED}_all_confusion_matrices.png"
     )

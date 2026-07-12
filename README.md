@@ -30,6 +30,10 @@ Run the model comparison:
 python -m scripts.compare_csp_lda_eegnet
 ```
 
+```powershell
+python -m scripts.plot_confussion_matrices
+```
+
 Deactivate the virtual environment:
 
 ```powershell

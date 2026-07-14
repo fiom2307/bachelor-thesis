@@ -9,6 +9,17 @@ CLASS_NAME_TO_LABEL = {
     "tongue": 3,
 }
 
+# (0, 1, 2, 3)
+CLASS_LABELS = tuple(
+    CLASS_NAME_TO_LABEL.values()
+)
+
+# ("Left hand", "Right hand", "Feet", "Tongue")
+CLASS_NAMES = tuple(
+    class_name.replace("_", " ").capitalize()
+    for class_name in CLASS_NAME_TO_LABEL
+)
+
 
 def get_train_labels(epochs: Epochs) -> np.ndarray:
     """

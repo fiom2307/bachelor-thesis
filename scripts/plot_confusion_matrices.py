@@ -4,12 +4,61 @@ from src.data.dataset import get_data_for_subject
 from src.data.preprocessing import apply_car
 from src.pipelines.csp_lda_pipeline import run_csp_lda_for_subject
 from src.pipelines.eegnet_pipeline import run_eegnet_for_subject
-from src.utils.paths import get_all_confusion_matrices_path
+from src.utils.paths import (
+    get_all_confusion_matrices_path,
+    get_subject_confusion_matrices_path,
+)
 from src.utils.plots import (
     create_confusion_matrix_comparison,
     save_figure,
-    show_figure,
 )
+
+
+def get_predictions_for_subject(
+    subject: int,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+] | None:
+    """Return true labels and model predictions for one subject."""
+    subject_name = f"A{subject:02d}"
+
+    print(f"\nRunning {subject_name}...")
+
+    data = get_data_for_subject(subject)
+
+    if data is None:
+        print(f"Skipping {subject_name}: data not found")
+        return None
+
+    X_train, y_train, X_eval, y_eval = data
+
+    X_train = apply_car(X_train)
+    X_eval = apply_car(X_eval)
+
+    data_car = (
+        X_train,
+        y_train,
+        X_eval,
+        y_eval,
+    )
+
+    _, csp_predictions = run_csp_lda_for_subject(
+        subject,
+        data_car,
+    )
+
+    _, eegnet_predictions = run_eegnet_for_subject(
+        subject,
+        data_car,
+    )
+
+    return (
+        np.asarray(y_eval),
+        np.asarray(csp_predictions),
+        np.asarray(eegnet_predictions),
+    )
 
 
 def collect_all_predictions() -> tuple[
@@ -23,56 +72,16 @@ def collect_all_predictions() -> tuple[
     all_eegnet_predictions = []
 
     for subject in range(1, 10):
-        subject_name = f"A{subject:02d}"
+        predictions = get_predictions_for_subject(subject)
 
-        print(f"\nRunning {subject_name}...")
-
-        data = get_data_for_subject(subject)
-
-        if data is None:
-            print(f"Skipping {subject_name}: data not found")
+        if predictions is None:
             continue
 
-        X_train, y_train, X_eval, y_eval = data
+        y_true, csp_predictions, eegnet_predictions = predictions
 
-        # Apply the same CAR preprocessing used during the experiment
-        X_train = apply_car(X_train)
-        X_eval = apply_car(X_eval)
-
-        data_car = (
-            X_train,
-            y_train,
-            X_eval,
-            y_eval,
-        )
-
-        csp_accuracy, csp_predictions = (
-            run_csp_lda_for_subject(
-                subject,
-                data_car,
-            )
-        )
-
-        eegnet_accuracy, eegnet_predictions = (
-            run_eegnet_for_subject(
-                subject,
-                data_car,
-            )
-        )
-
-        print(
-            f"{subject_name}: "
-            f"CSP+LDA={csp_accuracy:.4f}, "
-            f"EEGNet={eegnet_accuracy:.4f}"
-        )
-
-        all_y_true.append(np.asarray(y_eval))
-        all_csp_predictions.append(
-            np.asarray(csp_predictions)
-        )
-        all_eegnet_predictions.append(
-            np.asarray(eegnet_predictions)
-        )
+        all_y_true.append(y_true)
+        all_csp_predictions.append(csp_predictions)
+        all_eegnet_predictions.append(eegnet_predictions)
 
     if not all_y_true:
         raise RuntimeError("No predictions were collected.")
@@ -84,7 +93,17 @@ def collect_all_predictions() -> tuple[
     )
 
 
-def main():
+def create_all_subjects_confusion_matrices() -> None:
+    """Create one confusion-matrix figure using all subjects together."""
+    output_path = get_all_confusion_matrices_path()
+
+    if output_path.exists():
+        print(
+            "\nThe all-subject confusion matrices already exist:"
+            f"\n{output_path}"
+        )
+        return
+
     y_true, csp_predictions, eegnet_predictions = (
         collect_all_predictions()
     )
@@ -98,12 +117,75 @@ def main():
 
     output_file = save_figure(
         figure,
-        get_all_confusion_matrices_path(),
+        output_path,
     )
 
-    print(f"\nConfusion matrices saved to:\n{output_file}")
+    print(
+        "\nAll-subject confusion matrices saved to:"
+        f"\n{output_file}"
+    )
 
-    show_figure()
+
+def create_confusion_matrices_per_subject() -> None:
+    """Create one confusion-matrix figure for each subject."""
+    for subject in range(1, 10):
+        subject_name = f"A{subject:02d}"
+        output_path = get_subject_confusion_matrices_path(subject)
+
+        if output_path.exists():
+            print(
+                f"\nConfusion matrices for {subject_name} "
+                f"already exist:\n{output_path}"
+            )
+            continue
+
+        predictions = get_predictions_for_subject(subject)
+
+        if predictions is None:
+            continue
+
+        y_true, csp_predictions, eegnet_predictions = predictions
+
+        figure = create_confusion_matrix_comparison(
+            y_true=y_true,
+            csp_predictions=csp_predictions,
+            eegnet_predictions=eegnet_predictions,
+            subject_name=subject_name,
+        )
+
+        output_file = save_figure(
+            figure,
+            output_path,
+        )
+
+        print(
+            f"\nConfusion matrices for {subject_name} saved to:"
+            f"\n{output_file}"
+        )
+
+
+def create_confusion_matrices(mode: str) -> None:
+    """Create confusion matrices according to the selected mode."""
+    if mode == "all":
+        create_all_subjects_confusion_matrices()
+
+    elif mode == "per_subject":
+        create_confusion_matrices_per_subject()
+
+    elif mode == "both":
+        create_all_subjects_confusion_matrices()
+        create_confusion_matrices_per_subject()
+
+    else:
+        raise ValueError(
+            "Invalid mode. Use 'all', 'per_subject', or 'both'."
+        )
+
+
+def main() -> None:
+    mode = "both"
+
+    create_confusion_matrices(mode)
 
 
 if __name__ == "__main__":

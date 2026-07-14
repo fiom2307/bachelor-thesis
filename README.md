@@ -31,7 +31,7 @@ python -m scripts.compare_csp_lda_eegnet
 ```
 
 ```powershell
-python -m scripts.plot_confussion_matrices
+python -m scripts.plot_confusion_matrices
 ```
 
 Deactivate the virtual environment:

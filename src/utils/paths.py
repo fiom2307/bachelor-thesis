@@ -130,8 +130,32 @@ def get_results_accuracy_comparison_path() -> Path:
         / f"seed_{BASE_SEED}_csp_lda_vs_eegnet.csv"
     )
 
-def get_all_confusion_matrices_path():
-    return (
+def get_all_confusion_matrices_path() -> Path:
+    """Return the all-subject confusion matrices png path."""
+    path = (
         CONFUSION_MATRIX_RESULTS_DIR
+        / f"seed_{BASE_SEED}"
+    )
+
+    path.mkdir(parents=True, exist_ok=True)
+
+    return (
+        path
         / f"seed_{BASE_SEED}_all_confusion_matrices.png"
+    )
+
+def get_subject_confusion_matrices_path(subject: int) -> Path:
+    """Return the confusion matrices png path for one subject."""
+    subject_name = get_subject_name(subject)
+
+    path = (
+        CONFUSION_MATRIX_RESULTS_DIR
+        / f"seed_{BASE_SEED}"
+    )
+
+    path.mkdir(parents=True, exist_ok=True)
+
+    return (
+        path
+        / f"seed_{BASE_SEED}_{subject_name}_confusion_matrices.png"
     )

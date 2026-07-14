@@ -1,66 +1,114 @@
-from src.pipelines.csp_lda_pipeline import run_csp_lda_for_subject
-from src.pipelines.eegnet_pipeline import run_eegnet_for_subject
-from src.utils.results import save_accuracy_comparison, load_accuracy_comparison
-from src.data.dataset import get_data_for_subject
-from src.data.preprocessing import apply_car
+from src.pipelines.comparison_pipeline import (
+    get_accuracies_for_subject,
+)
+from src.utils.results import (
+    load_accuracy_comparison,
+    save_accuracy_comparison,
+)
 
-def print_results(results):
+
+AccuracyResult = tuple[str, float, float]
+
+
+def print_results(
+    results: list[AccuracyResult],
+) -> None:
+    """Print the accuracy comparison."""
+    if not results:
+        print("No accuracy results available.")
+        return
+
     print("-" * 70)
-    print(f"{'Subject':<10} {'CSP+LDA':<20} {'EEGNet':<20} {'Difference':<20}")
+    print(
+        f"{'Subject':<10} "
+        f"{'CSP+LDA':<20} "
+        f"{'EEGNet':<20} "
+        f"{'Difference':<20}"
+    )
     print("-" * 70)
 
-    csp_accs = []
-    eegnet_accs = []
+    csp_accuracies = []
+    eegnet_accuracies = []
 
-    for subject_name, csp_acc, eegnet_acc in results:
-        csp_text = f"{csp_acc:.4f} ({csp_acc * 100:.1f}%)"
-        eegnet_text = f"{eegnet_acc:.4f} ({eegnet_acc * 100:.1f}%)"
-        difference_text = f"{eegnet_acc - csp_acc:.4f}"
+    for subject_name, csp_accuracy, eegnet_accuracy in results:
+        csp_text = (
+            f"{csp_accuracy:.4f} "
+            f"({csp_accuracy * 100:.1f}%)"
+        )
+        eegnet_text = (
+            f"{eegnet_accuracy:.4f} "
+            f"({eegnet_accuracy * 100:.1f}%)"
+        )
+        difference_text = (
+            f"{eegnet_accuracy - csp_accuracy:.4f}"
+        )
 
-        print(f"{subject_name:<10} {csp_text:<20} {eegnet_text:<20} {difference_text:<20}")
+        print(
+            f"{subject_name:<10} "
+            f"{csp_text:<20} "
+            f"{eegnet_text:<20} "
+            f"{difference_text:<20}"
+        )
 
-        csp_accs.append(csp_acc)
-        eegnet_accs.append(eegnet_acc)
-    
-    mean_csp = sum(csp_accs) / len(csp_accs)
-    mean_eegnet = sum(eegnet_accs) / len(eegnet_accs)
+        csp_accuracies.append(csp_accuracy)
+        eegnet_accuracies.append(eegnet_accuracy)
+
+    mean_csp = sum(csp_accuracies) / len(csp_accuracies)
+    mean_eegnet = (
+        sum(eegnet_accuracies) / len(eegnet_accuracies)
+    )
     mean_difference = mean_eegnet - mean_csp
 
-    print("-" * 70)
-    print(f"{'Mean':<10} "
-          f"{mean_csp:.4f} ({mean_csp * 100:.1f}%){'':<6} "
-          f"{mean_eegnet:.4f} ({mean_eegnet * 100:.1f}%){'':<6} "
-          f"{mean_difference:.4f}")
+    mean_csp_text = (
+        f"{mean_csp:.4f} "
+        f"({mean_csp * 100:.1f}%)"
+    )
+    mean_eegnet_text = (
+        f"{mean_eegnet:.4f} "
+        f"({mean_eegnet * 100:.1f}%)"
+    )
 
-def run_experiment():
+    print("-" * 70)
+    print(
+        f"{'Mean':<10} "
+        f"{mean_csp_text:<20} "
+        f"{mean_eegnet_text:<20} "
+        f"{mean_difference:<20.4f}"
+    )
+
+
+def run_experiment() -> list[AccuracyResult]:
+    """Evaluate both models for every subject."""
     results = []
 
-    for subj in range(1, 10):
-        subject_name = f"A0{subj}"
+    for subject in range(1, 10):
+        subject_name = f"A{subject:02d}"
 
         print(f"\nRunning {subject_name}...")
 
-        data = get_data_for_subject(subj)
+        accuracies = get_accuracies_for_subject(subject)
 
-        if data is None:
-            print(f"Skipping {subject_name}: data not found")
+        if accuracies is None:
+            print(
+                f"Skipping {subject_name}: "
+                "data not found"
+            )
             continue
 
-        X_train, y_train, X_eval, y_eval = data
+        csp_accuracy, eegnet_accuracy = accuracies
 
-        X_train = apply_car(X_train)
-        X_eval = apply_car(X_eval)
-
-        data_car = X_train, y_train, X_eval, y_eval
-
-        csp_acc, _ = run_csp_lda_for_subject(subj, data_car)
-        eegnet_acc, _ = run_eegnet_for_subject(subj, data_car)
-
-        results.append((subject_name, csp_acc, eegnet_acc))
+        results.append(
+            (
+                subject_name,
+                csp_accuracy,
+                eegnet_accuracy,
+            )
+        )
 
     return results
 
-def main():
+
+def main() -> None:
     results = load_accuracy_comparison()
 
     if results is not None:
@@ -68,7 +116,12 @@ def main():
         return
 
     results = run_experiment()
-    
+
+    if not results:
+        raise RuntimeError(
+            "No experiment results were generated."
+        )
+
     save_accuracy_comparison(results)
 
     print_results(results)

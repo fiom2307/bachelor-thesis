@@ -13,7 +13,7 @@ from src.models.eegnet import (
 )
 
 
-def run_eegnet_for_subject(
+def evaluate_eegnet_for_subject(
     subject: int,
     data: tuple[
         np.ndarray,
@@ -21,8 +21,8 @@ def run_eegnet_for_subject(
         np.ndarray,
         np.ndarray,
     ],
-) -> float:
-    """Train or load the EEGNet ensemble and return its accuracy and predictions."""
+) -> tuple[float, np.ndarray]:
+    """Evaluate the EEGNet ensemble and return its accuracy and predictions."""
     X_train, y_train, X_eval, y_eval = data
 
     X_train, X_eval = normalize_epochs(

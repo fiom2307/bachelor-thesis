@@ -8,6 +8,7 @@ from scipy.io import loadmat
 from src.data.labels import get_train_labels
 from src.data.preprocessing import (
     apply_bandpass_filter,
+    apply_car,
     create_epochs,
     extract_events,
     get_epochs_data,
@@ -72,12 +73,13 @@ def load_epochs(
     The continuous EEG recording is loaded, the 22 EEG channels are selected,
     and an 8–30 Hz band-pass filter is applied. The recording is then divided
     into epochs from 0.5 to 4.0 seconds relative to each motor imagery cue.
+    Common average reference (CAR) is applied to the resulting EEG epochs.
 
     Training labels are obtained from the GDF event annotations.
     Evaluation labels are loaded from the corresponding MATLAB file.
 
     Returns:
-        A tuple containing the EEG epochs and their class labels.
+        A tuple containing the preprocessed EEG epochs and their class labels.
         If the required cue events are not found, returns (None, None).
     """
     file_path = Path(file_path)
@@ -106,6 +108,8 @@ def load_epochs(
     )
 
     X = get_epochs_data(epochs)
+
+    X = apply_car(X)
 
     if is_eval:
         if mat_path is None:

@@ -7,7 +7,7 @@ from src.models.csp_lda import (
 )
 
 
-def run_csp_lda_for_subject(
+def evaluate_csp_lda_for_subject(
     subject: int,
     data: tuple[
         np.ndarray,
@@ -15,8 +15,8 @@ def run_csp_lda_for_subject(
         np.ndarray,
         np.ndarray,
     ],
-) -> float:
-    """Train or load CSP+LDA and return its accuracy and predictions."""
+) -> tuple[float, np.ndarray]:
+    """Evaluate CSP+LDA and return its accuracy and predictions."""
     X_train, y_train, X_eval, y_eval = data
 
     models = train_or_load_csp_lda(

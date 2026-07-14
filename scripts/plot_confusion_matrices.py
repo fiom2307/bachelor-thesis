@@ -1,9 +1,3 @@
-import numpy as np
-
-from src.data.dataset import get_data_for_subject
-from src.data.preprocessing import apply_car
-from src.pipelines.csp_lda_pipeline import run_csp_lda_for_subject
-from src.pipelines.eegnet_pipeline import run_eegnet_for_subject
 from src.utils.paths import (
     get_all_confusion_matrices_path,
     get_subject_confusion_matrices_path,
@@ -12,85 +6,10 @@ from src.utils.plots import (
     create_confusion_matrix_comparison,
     save_figure,
 )
-
-
-def get_predictions_for_subject(
-    subject: int,
-) -> tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-] | None:
-    """Return true labels and model predictions for one subject."""
-    subject_name = f"A{subject:02d}"
-
-    print(f"\nRunning {subject_name}...")
-
-    data = get_data_for_subject(subject)
-
-    if data is None:
-        print(f"Skipping {subject_name}: data not found")
-        return None
-
-    X_train, y_train, X_eval, y_eval = data
-
-    X_train = apply_car(X_train)
-    X_eval = apply_car(X_eval)
-
-    data_car = (
-        X_train,
-        y_train,
-        X_eval,
-        y_eval,
-    )
-
-    _, csp_predictions = run_csp_lda_for_subject(
-        subject,
-        data_car,
-    )
-
-    _, eegnet_predictions = run_eegnet_for_subject(
-        subject,
-        data_car,
-    )
-
-    return (
-        np.asarray(y_eval),
-        np.asarray(csp_predictions),
-        np.asarray(eegnet_predictions),
-    )
-
-
-def collect_all_predictions() -> tuple[
-    np.ndarray,
-    np.ndarray,
-    np.ndarray,
-]:
-    """Collect true labels and predictions from all subjects."""
-    all_y_true = []
-    all_csp_predictions = []
-    all_eegnet_predictions = []
-
-    for subject in range(1, 10):
-        predictions = get_predictions_for_subject(subject)
-
-        if predictions is None:
-            continue
-
-        y_true, csp_predictions, eegnet_predictions = predictions
-
-        all_y_true.append(y_true)
-        all_csp_predictions.append(csp_predictions)
-        all_eegnet_predictions.append(eegnet_predictions)
-
-    if not all_y_true:
-        raise RuntimeError("No predictions were collected.")
-
-    return (
-        np.concatenate(all_y_true),
-        np.concatenate(all_csp_predictions),
-        np.concatenate(all_eegnet_predictions),
-    )
+from src.pipelines.comparison_pipeline import (
+    collect_all_predictions,
+    get_predictions_for_subject,
+)
 
 
 def create_all_subjects_confusion_matrices() -> None:

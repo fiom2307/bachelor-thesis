@@ -105,7 +105,6 @@ def train_or_load_eegnet(
     Previously saved models are loaded instead of being trained again.
     """
     seed = BASE_SEED + subject
-    set_seed(seed)
 
     n_channels = X_train.shape[1]
     n_samples = X_train.shape[2]

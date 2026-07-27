@@ -1,4 +1,5 @@
 from pathlib import Path
+import mne
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,16 +7,12 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from src.analysis.erd import ERDResult
 
-
-CLASS_LABELS = [0, 1, 2, 3]
-
-CLASS_NAMES = [
-    "Left hand",
-    "Right hand",
-    "Feet",
-    "Tongue",
-]
+from src.data.labels import (
+    CLASS_LABELS,
+    CLASS_NAMES,
+)
 
 
 def _draw_confusion_matrix(
@@ -80,6 +77,107 @@ def create_confusion_matrix_comparison(
     )
 
     figure.tight_layout()
+
+    return figure
+
+
+def create_erd_topomap_figure(
+    epochs: mne.Epochs,
+    results: dict[tuple[str, int], ERDResult],
+    band_names: list[str],
+    subject: int,
+    baseline: tuple[float, float],
+    imagery_window: tuple[float, float],
+) -> Figure:
+    """
+    Create class-wise ERD/ERS topomaps for several frequency bands.
+
+    Each row represents one frequency band and each column represents
+    one motor-imagery class.
+    """
+    figure, axes = plt.subplots(
+        nrows=len(band_names),
+        ncols=len(CLASS_LABELS),
+        figsize=(14, 7),
+        constrained_layout=True,
+    )
+
+    for row_index, band_name in enumerate(band_names):
+        band_topographies = [
+            results[(band_name, class_id)].topography
+            for class_id in CLASS_LABELS
+        ]
+
+        # Use the same color scale for all classes within one band.
+        band_limit = max(
+            float(np.max(np.abs(topography)))
+            for topography in band_topographies
+        )
+
+        row_image = None
+
+        for column_index, class_id in enumerate(CLASS_LABELS):
+            axis = axes[row_index, column_index]
+
+            result = results[(band_name, class_id)]
+
+            row_image, _ = mne.viz.plot_topomap(
+                result.topography,
+                epochs.info,
+                axes=axis,
+                show=False,
+                sensors=True,
+                contours=6,
+                cmap="RdBu_r",
+                vlim=(-band_limit, band_limit),
+            )
+
+            if row_index == 0:
+                axis.set_title(
+                    CLASS_NAMES[class_id],
+                    fontsize=12,
+                )
+
+            axis.text(
+                0.5,
+                -0.12,
+                f"n = {result.n_trials}",
+                transform=axis.transAxes,
+                horizontalalignment="center",
+                fontsize=9,
+            )
+
+        axes[row_index, 0].text(
+            -0.35,
+            0.5,
+            band_name,
+            transform=axes[row_index, 0].transAxes,
+            rotation=90,
+            verticalalignment="center",
+            horizontalalignment="center",
+            fontsize=12,
+            fontweight="bold",
+        )
+
+        if row_image is not None:
+            colorbar = figure.colorbar(
+                row_image,
+                ax=axes[row_index, :].tolist(),
+                shrink=0.75,
+            )
+
+            colorbar.set_label(
+                "Power change from baseline (%)"
+            )
+
+    figure.suptitle(
+        f"Subject {subject:02d}: class-wise ERD/ERS topographies\n"
+        f"Baseline: {baseline[0]:.1f} to {baseline[1]:.1f} s | "
+        f"Imagery average: "
+        f"{imagery_window[0]:.1f} to "
+        f"{imagery_window[1]:.1f} s",
+        fontsize=14,
+    )
 
     return figure
 

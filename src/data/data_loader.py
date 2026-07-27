@@ -14,6 +14,8 @@ from src.data.preprocessing import (
     get_epochs_data,
     get_event_ids_for_session,
     pick_eeg_channels,
+    set_bci_2a_montage,
+    select_artifact_free_cue_events,
 )
 from src.utils.paths import is_eval_file
 
@@ -128,3 +130,77 @@ def load_epochs(
         )
 
     return X, y
+
+
+def load_erd_epochs(
+    file_path: str | Path,
+    mat_path: str | Path,
+) -> tuple[mne.Epochs | None, np.ndarray | None]:
+    """
+    TODO: same as load erd but with set montage and returns epochs and not np.array, also tmin and tmax changed 
+    another CAR, only loads evaluation file, 
+    for now also this different select_artifact_free_cue_events
+    """
+    file_path = Path(file_path)
+
+    raw = load_raw_gdf(file_path)
+
+    raw_eeg = pick_eeg_channels(raw)
+
+    set_bci_2a_montage(raw_eeg)
+
+    apply_bandpass_filter(raw_eeg)
+
+    events, event_id = extract_events(raw)
+
+    is_eval = is_eval_file(file_path)
+
+    event_id_used = get_event_ids_for_session(
+        event_id,
+        is_eval,
+    )
+
+    if event_id_used is None:
+        return None, None
+
+    # Select only cue events belonging to clean trials.
+    clean_cue_events, clean_trial_mask = (
+        select_artifact_free_cue_events(
+            events=events,
+            event_id=event_id,
+            event_id_used=event_id_used,
+        )
+    )
+
+    epochs = create_epochs(
+        raw_eeg,
+        clean_cue_events,
+        event_id_used,
+        tmin=-2.0,
+        tmax=4.0,
+    )
+
+    # Apply CAR
+    epochs.set_eeg_reference(
+        ref_channels="average",
+        projection=False,
+        verbose=False,
+    )
+
+    all_labels = load_true_labels(mat_path)
+
+    # Remove labels corresponding to artifact-marked trials.
+    clean_labels = all_labels[
+        clean_trial_mask
+    ]
+
+    if len(epochs) != len(clean_labels):
+        raise ValueError(
+            "MNE dropped additional epochs after artifact removal: "
+            f"{len(clean_labels)} clean labels but "
+            f"{len(epochs)} retained epochs."
+        )
+
+    y = clean_labels
+
+    return epochs, y

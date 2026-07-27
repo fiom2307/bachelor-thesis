@@ -161,3 +161,13 @@ def get_subject_confusion_matrices_path(subject: int) -> Path:
         path
         / f"seed_{BASE_SEED}_{subject_name}_confusion_matrices.png"
     )
+
+def get_erd_topomaps_path(subject: int) -> Path:
+    """Return the output path for a subject's ERD/ERS topomap figure."""
+    subject_name = get_subject_name(subject)
+
+    filename = (
+        f"{subject_name}_erd_topomaps.png"
+    )
+
+    return ERD_RESULTS_DIR / filename

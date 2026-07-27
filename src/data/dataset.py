@@ -1,6 +1,7 @@
+import mne
 import numpy as np
 
-from src.data.data_loader import load_epochs
+from src.data.data_loader import load_epochs, load_erd_epochs
 from src.utils.paths import get_subject_files
 
 
@@ -44,3 +45,26 @@ def get_data_for_subject(
         return None
 
     return X_train, y_train, X_eval, y_eval
+
+def get_evaluation_erd_epochs_for_subject(
+    subject: int,
+) -> tuple[mne.Epochs, np.ndarray]:
+    """
+    Load evaluation epochs and their true labels for ERD analysis.
+
+    Returns:
+        Evaluation epochs and their corresponding true class labels.
+    """
+    files = get_subject_files(subject)
+
+    if files is None:
+        return None
+
+    _, evaluation_file, mat_file = files
+
+    epochs, labels = load_erd_epochs(evaluation_file, mat_file)
+
+    if epochs is None or labels is None:
+        return None
+
+    return epochs, labels

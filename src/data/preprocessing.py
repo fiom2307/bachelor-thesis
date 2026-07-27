@@ -13,6 +13,8 @@ from src.utils.config import (
 )
 
 
+TRIAL_START_EVENT_CODE = "768"
+
 EVALUATION_CUE_CODE = "783"
 
 TRAINING_EVENT_CODES = {
@@ -21,6 +23,193 @@ TRAINING_EVENT_CODES = {
     "feet": "771",
     "tongue": "772",
 }
+
+ARTIFACT_EVENT_CODE = "1023"
+
+BCI_2A_CHANNEL_NAMES = [
+    "Fz",
+    "FC3",
+    "FC1",
+    "FCz",
+    "FC2",
+    "FC4",
+    "C5",
+    "C3",
+    "C1",
+    "Cz",
+    "C2",
+    "C4",
+    "C6",
+    "CP3",
+    "CP1",
+    "CPz",
+    "CP2",
+    "CP4",
+    "P1",
+    "Pz",
+    "P2",
+    "POz",
+]
+
+
+def select_artifact_free_cue_events(
+    events: np.ndarray,
+    event_id: dict[str, int],
+    event_id_used: dict[str, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    TODO
+    Select cue events belonging to trials not marked as artifacts.
+
+    Parameters
+    ----------
+    events
+        Complete MNE event array.
+
+    event_id
+        Mapping from original GDF annotation names, such as
+        "768" and "1023", to MNE's internal event identifiers.
+
+    event_id_used
+        Cue events used to construct the epochs.
+
+    Returns
+    -------
+    clean_cue_events
+        Cue events belonging to artifact-free trials.
+
+    clean_trial_mask
+        Boolean mask aligned with all cue events. True indicates
+        an artifact-free trial.
+    """
+    cue_event_ids = np.asarray(
+        list(event_id_used.values()),
+        dtype=int,
+    )
+
+    all_cue_events = events[
+        np.isin(events[:, 2], cue_event_ids)
+    ]
+
+    if len(all_cue_events) == 0:
+        raise ValueError("No motor-imagery cue events were found.")
+
+    # Some recordings may contain no rejected trials.
+    if ARTIFACT_EVENT_CODE not in event_id:
+        clean_trial_mask = np.ones(
+            len(all_cue_events),
+            dtype=bool,
+        )
+
+        print("Artifact markers found: 0")
+
+        return all_cue_events, clean_trial_mask
+
+    if TRIAL_START_EVENT_CODE not in event_id:
+        raise KeyError(
+            f"Trial-start event {TRIAL_START_EVENT_CODE} "
+            "was not found."
+        )
+
+    trial_start_id = event_id[TRIAL_START_EVENT_CODE]
+    artifact_id = event_id[ARTIFACT_EVENT_CODE]
+
+    trial_start_samples = events[
+        events[:, 2] == trial_start_id,
+        0,
+    ]
+
+    artifact_samples = events[
+        events[:, 2] == artifact_id,
+        0,
+    ]
+
+    if len(trial_start_samples) == 0:
+        raise ValueError("No trial-start events were found.")
+
+    # Associate every cue with the most recent trial-start event.
+    cue_start_indices = (
+        np.searchsorted(
+            trial_start_samples,
+            all_cue_events[:, 0],
+            side="right",
+        )
+        - 1
+    )
+
+    if np.any(cue_start_indices < 0):
+        raise ValueError(
+            "At least one cue occurs before the first trial start."
+        )
+
+    cue_trial_starts = trial_start_samples[
+        cue_start_indices
+    ]
+
+    # Associate every 1023 marker with its trial start.
+    artifact_start_indices = (
+        np.searchsorted(
+            trial_start_samples,
+            artifact_samples,
+            side="right",
+        )
+        - 1
+    )
+
+    valid_artifact_indices = (
+        artifact_start_indices >= 0
+    )
+
+    rejected_trial_starts = trial_start_samples[
+        artifact_start_indices[valid_artifact_indices]
+    ]
+
+    clean_trial_mask = ~np.isin(
+        cue_trial_starts,
+        rejected_trial_starts,
+    )
+
+    clean_cue_events = all_cue_events[
+        clean_trial_mask
+    ]
+
+    return clean_cue_events, clean_trial_mask
+
+
+def set_bci_2a_montage(raw_eeg: BaseRaw) -> None:
+    """
+    TODO
+    Assign the official BCI Competition IV 2a channel names and
+    their standard 10-20 electrode positions.
+
+    The GDF files do not necessarily contain channel names in a form
+    that MNE can directly match to a standard montage.
+    """
+    if len(raw_eeg.ch_names) != len(BCI_2A_CHANNEL_NAMES):
+        raise ValueError(
+            f"Expected {len(BCI_2A_CHANNEL_NAMES)} EEG channels, "
+            f"but found {len(raw_eeg.ch_names)}."
+        )
+
+    rename_mapping = {
+        original_name: standard_name
+        for original_name, standard_name in zip(
+            raw_eeg.ch_names,
+            BCI_2A_CHANNEL_NAMES,
+        )
+    }
+
+    raw_eeg.rename_channels(rename_mapping)
+
+    montage = mne.channels.make_standard_montage(
+        "standard_1020"
+    )
+
+    raw_eeg.set_montage(
+        montage,
+        match_case=False,
+        on_missing="raise",
+    )
 
 
 def pick_eeg_channels(raw: BaseRaw) -> BaseRaw:
@@ -122,19 +311,21 @@ def create_epochs(
     raw_eeg: BaseRaw,
     events: np.ndarray,
     event_id_used: dict[str, int],
+    tmin: float = EPOCH_TMIN,
+    tmax: float = EPOCH_TMAX,
 ) -> Epochs:
     """
     Divide the continuous EEG recording into motor imagery epochs.
 
-    Each epoch contains the signal from 0.5 to 4.0 seconds relative
+    Each epoch contains the signal from tmin to tmax seconds relative
     to the onset of its motor imagery cue.
     """
     return mne.Epochs(
         raw_eeg,
         events,
         event_id=event_id_used,
-        tmin=EPOCH_TMIN,
-        tmax=EPOCH_TMAX,
+        tmin=tmin,
+        tmax=tmax,
         baseline=None,
         preload=True,
         verbose=False,

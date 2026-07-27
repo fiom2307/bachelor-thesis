@@ -70,15 +70,17 @@ def load_epochs(
     mat_path: str | Path | None = None,
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     """
-    Load and preprocess EEG trials from a GDF recording.
+    Load and preprocess artifact-free EEG trials from a GDF recording.
 
     The continuous EEG recording is loaded, the 22 EEG channels are selected,
-    and an 8–30 Hz band-pass filter is applied. The recording is then divided
-    into epochs from 0.5 to 4.0 seconds relative to each motor imagery cue.
-    Common average reference (CAR) is applied to the resulting EEG epochs.
+    and an 8–30 Hz band-pass filter is applied. Trials marked with GDF event
+    1023 are removed. The remaining recording is divided into epochs from
+    0.5 to 4.0 seconds relative to each motor-imagery cue, and common average
+    reference (CAR) is applied.
 
-    Training labels are obtained from the GDF event annotations.
-    Evaluation labels are loaded from the corresponding MATLAB file.
+    Training labels are obtained from the retained GDF cue events.
+    Evaluation labels are loaded from the MATLAB file and filtered using
+    the same artifact-free trial mask.
 
     Returns:
         A tuple containing the preprocessed EEG epochs and their class labels.
@@ -103,14 +105,21 @@ def load_epochs(
     if event_id_used is None:
         return None, None
 
+    clean_cue_events, clean_trial_mask = (
+        select_artifact_free_cue_events(
+            events=events,
+            event_id=event_id,
+            event_id_used=event_id_used,
+        )
+    )
+
     epochs = create_epochs(
         raw_eeg,
-        events,
+        clean_cue_events,
         event_id_used,
     )
 
     X = get_epochs_data(epochs)
-
     X = apply_car(X)
 
     if is_eval:
@@ -119,7 +128,17 @@ def load_epochs(
                 f"A MAT label file is required for evaluation file: {file_path}"
             )
 
-        y = load_true_labels(mat_path)
+        all_labels = load_true_labels(mat_path)
+
+        if len(all_labels) != len(clean_trial_mask):
+            raise ValueError(
+                "The number of evaluation labels does not match "
+                "the number of motor-imagery cue events: "
+                f"{len(all_labels)} labels and "
+                f"{len(clean_trial_mask)} cues."
+            )
+
+        y = all_labels[clean_trial_mask]
     else:
         y = get_train_labels(epochs)
 
@@ -137,9 +156,17 @@ def load_erd_epochs(
     mat_path: str | Path,
 ) -> tuple[mne.Epochs | None, np.ndarray | None]:
     """
-    TODO: same as load erd but with set montage and returns epochs and not np.array, also tmin and tmax changed 
-    another CAR, only loads evaluation file, 
-    for now also this different select_artifact_free_cue_events
+    Load artifact-free evaluation epochs for ERD/ERS analysis.
+
+    The processing steps are similar to ``load_epochs``, but the electrode
+    montage is added and the epochs are returned as an MNE ``Epochs`` object
+    instead of a NumPy array. Epochs extend from -2.0 to 4.0 seconds relative
+    to the motor-imagery cue, and common average reference is applied directly
+    to the MNE object.
+
+    This function only loads evaluation recordings. True labels are obtained
+    from the corresponding MATLAB file, and trials marked with GDF event 1023
+    are excluded.
     """
     file_path = Path(file_path)
 
@@ -188,6 +215,14 @@ def load_erd_epochs(
     )
 
     all_labels = load_true_labels(mat_path)
+
+    if len(all_labels) != len(clean_trial_mask):
+        raise ValueError(
+            "The number of evaluation labels does not match "
+            "the number of motor-imagery cue events: "
+            f"{len(all_labels)} labels and "
+            f"{len(clean_trial_mask)} cues."
+        )
 
     # Remove labels corresponding to artifact-marked trials.
     clean_labels = all_labels[

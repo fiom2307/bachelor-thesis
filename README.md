@@ -42,6 +42,10 @@ Print the classification reports:
 python -m scripts.print_classification_reports
 ```
 
+```powershell
+python -m scripts.plot_erd
+```
+
 Deactivate the virtual environment:
 
 ```powershell

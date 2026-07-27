@@ -14,6 +14,7 @@ EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
 CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
+ERD_RESULTS_DIR = RESULTS_DIR / "erd"
 
 
 # Create output directories
@@ -21,6 +22,7 @@ EEGNET_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 CSP_LDA_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 ACCURACY_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 CONFUSION_MATRIX_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+ERD_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_subject_name(subject: int) -> str:

@@ -42,6 +42,8 @@ Print the classification reports:
 python -m scripts.print_classification_reports
 ```
 
+Generate the erd topomaps:
+
 ```powershell
 python -m scripts.plot_erd
 ```

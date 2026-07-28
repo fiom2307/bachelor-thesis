@@ -35,8 +35,18 @@ def compute_class_erd(
     imagery_window: tuple[float, float] = (0.5, 3.5),
 ) -> ERDResult:
     """
-    Calculate the average ERD/ERS for one motor-imagery class
-    and one frequency band.
+    Compute class-average ERD/ERS for one frequency band.
+
+    Morlet power is calculated separately for every artifact-free
+    trial. Power is then averaged across the frequencies within the
+    selected band and across trials. The resulting class-average band
+    power is expressed as the percentage change relative to the mean
+    power during the baseline interval.
+
+    Negative values indicate event-related desynchronization (ERD),
+    while positive values indicate event-related synchronization
+    (ERS). The topography is obtained by averaging the ERD/ERS time
+    course across the selected motor-imagery interval.
     TODO: check comments
     """
     labels = np.asarray(labels)
@@ -57,8 +67,6 @@ def compute_class_erd(
             f"No trials found for class {class_id}."
         )
 
-    # Shape:
-    # trials × channels × time
     class_data = epochs.get_data()[class_mask]
 
     frequencies = np.arange(
@@ -70,11 +78,8 @@ def compute_class_erd(
     if len(frequencies) == 0:
         raise ValueError("The frequency range is empty.")
 
-    # Approximately constant temporal window across frequencies.
     n_cycles = frequencies / 2.0
 
-    # Shape:
-    # trials × channels × frequencies × time
     power = tfr_array_morlet(
         class_data,
         sfreq=float(epochs.info["sfreq"]),
@@ -111,34 +116,39 @@ def compute_class_erd(
             f"epoch interval {epochs.tmin, epochs.tmax}."
         )
 
-    # Baseline power is calculated separately for every:
-    # trial × channel × frequency.
-    baseline_power = power[
-        ...,
+    band_power = power.mean(axis=2)
+
+    mean_band_power = band_power.mean(axis=0)
+
+    baseline_power = mean_band_power[
+        :,
         baseline_mask,
     ].mean(
         axis=-1,
         keepdims=True,
     )
 
-    epsilon = np.finfo(np.float64).eps
+    if not np.all(np.isfinite(baseline_power)):
+        raise ValueError(
+            "Baseline power contains non-finite values."
+        )
 
-    # Percentage change relative to baseline.
-    erd_per_trial = (
+    if np.any(baseline_power <= 0.0):
+        raise ValueError(
+            "Baseline power must be strictly positive."
+        )
+
+    # Classical percentage ERD/ERS.
+    # Negative values indicate ERD.
+    # Positive values indicate ERS.
+    # Shape: channels × time.
+    erd_ers_time_course = (
         100.0
-        * (power - baseline_power)
-        / np.maximum(baseline_power, epsilon)
+        * (mean_band_power - baseline_power)
+        / baseline_power
     )
 
-    # Average across trials and frequencies.
-    # Result: channels × time.
-    mean_erd = erd_per_trial.mean(
-        axis=(0, 2)
-    )
-
-    # Average across the selected motor-imagery interval.
-    # Result: one value per channel.
-    topography = mean_erd[
+    topography = erd_ers_time_course[
         :,
         imagery_mask,
     ].mean(
@@ -146,7 +156,7 @@ def compute_class_erd(
     )
 
     return ERDResult(
-        time_course=mean_erd,
+        time_course=erd_ers_time_course,
         topography=topography,
         times=times.copy(),
         n_trials=n_trials,

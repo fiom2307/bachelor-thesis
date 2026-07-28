@@ -11,7 +11,7 @@ from src.utils.plots import (
 )
 
 
-SUBJECT = 1
+SUBJECT = 8
 
 FREQUENCY_BANDS = {
     "Mu (8–13 Hz)": (8.0, 13.0),
@@ -30,16 +30,6 @@ def main() -> None:
     )
 
     print(f"Subject: {SUBJECT:02d}")
-    print(f"Epoch shape: {epochs.get_data().shape}")
-    print(
-        f"Epoch interval: "
-        f"{epochs.tmin:.1f} to {epochs.tmax:.1f} s"
-    )
-    print(f"Channels: {epochs.ch_names}")
-    print(
-        "Trials per class: "
-        f"{np.bincount(labels, minlength=4)}"
-    )
 
     output_path = get_erd_topomaps_path(SUBJECT)
     

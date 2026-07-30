@@ -2,9 +2,11 @@ from src.utils.paths import (
     get_all_confusion_matrices_path,
     get_subject_confusion_matrices_path,
 )
-from src.utils.plots import (
-    create_confusion_matrix_comparison,
+from src.visualization.common import (
     save_figure,
+)
+from src.visualization.confusion_matrices import (
+    create_confusion_matrix_comparison,
 )
 from src.pipelines.comparison_pipeline import (
     collect_all_predictions,

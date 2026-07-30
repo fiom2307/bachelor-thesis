@@ -15,11 +15,13 @@ from src.utils.paths import (
     get_psd_path,
     get_tfr_path,
 )
-from src.utils.plots import (
+from src.visualization.common import (
+    save_figure,
+)
+from src.visualization.spectral import (
     create_channel_psd_figure,
     create_channel_tfr_figure,
     create_erd_topomap_figure,
-    save_figure,
 )
 
 

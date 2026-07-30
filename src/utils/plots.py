@@ -12,7 +12,7 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 
-from src.analysis.erd import (
+from src.analysis.spectral import (
     ChannelPSDResult,
     ChannelTFRResult,
     ERDResult,

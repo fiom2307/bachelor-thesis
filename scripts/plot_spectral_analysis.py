@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import mne
 import numpy as np
 
-from src.analysis.erd import (
+from src.analysis.spectral import (
     compute_all_erd_results,
     compute_channel_psd,
     compute_channel_tfr,

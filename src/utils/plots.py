@@ -1,14 +1,22 @@
 from pathlib import Path
-import mne
 
 import matplotlib.pyplot as plt
+import mne
 import numpy as np
-
 from matplotlib.axes import Axes
+from matplotlib.colors import TwoSlopeNorm
 from matplotlib.figure import Figure
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from src.analysis.erd import ERDResult
+from matplotlib.lines import Line2D
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    confusion_matrix,
+)
 
+from src.analysis.erd import (
+    ChannelPSDResult,
+    ChannelTFRResult,
+    ERDResult,
+)
 from src.data.labels import (
     CLASS_LABELS,
     CLASS_NAMES,
@@ -178,6 +186,239 @@ def create_erd_topomap_figure(
         f"{imagery_window[1]:.1f} s",
         fontsize=14,
     )
+
+    return figure
+
+
+def create_channel_tfr_figure(
+    result: ChannelTFRResult,
+    subject: int,
+    imagery_window: tuple[float, float],
+) -> plt.Figure:
+    """
+    Plot one baseline-normalized TFR for each MI class.
+    """
+    class_names = list(
+        result.power_by_class
+    )
+
+    if len(class_names) != 4:
+        raise ValueError(
+            "The TFR figure expects exactly four classes."
+        )
+
+    figure, axes = plt.subplots(
+        nrows=2,
+        ncols=2,
+        figsize=(13, 9),
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+
+    flat_axes = axes.ravel()
+
+    all_values = np.concatenate(
+        [
+            result.power_by_class[
+                class_name
+            ].ravel()
+            for class_name in class_names
+        ]
+    )
+
+    limit = np.nanpercentile(
+        np.abs(all_values),
+        99,
+    )
+
+    if not np.isfinite(limit) or limit == 0:
+        limit = 1.0
+
+    normalization = TwoSlopeNorm(
+        vmin=-limit,
+        vcenter=0.0,
+        vmax=limit,
+    )
+
+    image = None
+
+    for axis, class_name in zip(
+        flat_axes,
+        class_names,
+    ):
+        class_tfr = result.power_by_class[
+            class_name
+        ]
+
+        n_trials = result.n_trials_by_class[
+            class_name
+        ]
+
+        image = axis.pcolormesh(
+            result.times,
+            result.freqs,
+            class_tfr,
+            shading="auto",
+            cmap="RdBu_r",
+            norm=normalization,
+        )
+
+        axis.axvline(
+            0.0,
+            color="red",
+            linestyle="--",
+            linewidth=1.5,
+        )
+
+        axis.axvline(
+            imagery_window[0],
+            color="green",
+            linestyle="--",
+            linewidth=1.5,
+        )
+
+        axis.axvline(
+            imagery_window[1],
+            color="blue",
+            linestyle="--",
+            linewidth=1.5,
+        )
+
+        axis.set_title(
+            f"{class_name}\n"
+            f"n = {n_trials}"
+        )
+
+        axis.set_xlabel(
+            "Time relative to cue (s)"
+        )
+
+        axis.set_ylabel(
+            "Frequency (Hz)"
+        )
+
+    legend_handles = [
+        Line2D(
+            [0],
+            [0],
+            color="red",
+            linestyle="--",
+            label="Cue",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="green",
+            linestyle="--",
+            label="Analysis window start",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="blue",
+            linestyle="--",
+            label="Analysis window end",
+        ),
+    ]
+
+    flat_axes[1].legend(
+        handles=legend_handles,
+        loc="upper right",
+    )
+
+    assert image is not None
+
+    colorbar = figure.colorbar(
+        image,
+        ax=flat_axes.tolist(),
+        shrink=0.90,
+        pad=0.02,
+    )
+
+    colorbar.set_label(
+        "Power change from baseline (%)"
+    )
+
+    figure.suptitle(
+        f"Subject A{subject:02d} — "
+        f"TFR at {result.channel}",
+        fontsize=15,
+    )
+
+    return figure
+
+
+def create_channel_psd_figure(
+    result: ChannelPSDResult,
+    subject: int,
+) -> plt.Figure:
+    """
+    Plot mean PSD and SEM for all MI classes and the baseline.
+    """
+    figure, axis = plt.subplots(
+        figsize=(12, 6),
+        constrained_layout=True,
+    )
+
+    for condition_name, mean in (
+        result.mean_by_condition.items()
+    ):
+        sem = result.sem_by_condition[
+            condition_name
+        ]
+
+        if condition_name == "Baseline":
+            line, = axis.plot(
+                result.freqs,
+                mean,
+                linewidth=2,
+                linestyle="--",
+                color="gray",
+                label="Baseline",
+            )
+        else:
+            line, = axis.plot(
+                result.freqs,
+                mean,
+                linewidth=2,
+                label=condition_name,
+            )
+
+        axis.fill_between(
+            result.freqs,
+            mean - sem,
+            mean + sem,
+            color=line.get_color(),
+            alpha=0.18,
+        )
+
+    axis.set_xlim(
+        result.freqs[0],
+        result.freqs[-1],
+    )
+
+    axis.set_ylim(bottom=0)
+
+    axis.set_xlabel(
+        "Frequency (Hz)"
+    )
+
+    axis.set_ylabel(
+        "Power spectral density (µV²/Hz)"
+    )
+
+    axis.set_title(
+        f"Subject A{subject:02d} — "
+        f"PSD at {result.channel}"
+    )
+
+    axis.grid(
+        visible=True,
+        alpha=0.35,
+    )
+
+    axis.legend()
 
     return figure
 

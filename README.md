@@ -42,10 +42,10 @@ Print the classification reports:
 python -m scripts.print_classification_reports
 ```
 
-Generate the erd topomaps:
+Generate the ERD/ERS topographies, time-frequency representations, and power spectral density plots:
 
 ```powershell
-python -m scripts.plot_erd
+python -m scripts.plot_spectral_analysis
 ```
 
 Deactivate the virtual environment:

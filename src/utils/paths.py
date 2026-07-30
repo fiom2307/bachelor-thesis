@@ -15,6 +15,7 @@ CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
 CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
+SHAP_RESULTS_DIR = RESULTS_DIR / "shap"
 
 
 # Create output directories
@@ -24,6 +25,7 @@ for directory in (
     ACCURACY_RESULTS_DIR,
     CONFUSION_MATRIX_RESULTS_DIR,
     SPECTRAL_ANALYSIS_DIR,
+    SHAP_RESULTS_DIR,
 ):
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -264,3 +266,54 @@ def get_psd_path(
     )
 
     return output_dir / f"{channel}.png"
+
+
+def get_shap_channel_time_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(SHAP_RESULTS_DIR / "channel_time")
+    
+    return path / f"{subject_name}_shap_channel_time.png"
+
+
+def get_shap_temporal_relevance_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(SHAP_RESULTS_DIR / "temporal_relevance")
+    
+    return path / f"{subject_name}_shap_temporal.png"
+
+
+def get_shap_topographies_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(SHAP_RESULTS_DIR / "topographies")
+    
+    return path / f"{subject_name}_shap_topographies.png"
+
+def get_shap_values_path(
+    subject: int,
+) -> Path:
+    """Return the saved SHAP values path."""
+    subject_name = get_subject_name(subject)
+
+    output_dir = _create_directory(
+        SHAP_RESULTS_DIR / "values"
+    )
+
+    return output_dir / f"{subject_name}_shap_values.npz"

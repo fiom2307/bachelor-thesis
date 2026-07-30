@@ -26,7 +26,7 @@ from src.visualization.spectral import (
 
 
 # Subjects A01–A09.
-SUBJECTS = range(1, 10)
+SUBJECTS = range(1, 2)
 
 # C3: right-hand imagery.
 # Cz: feet imagery.
@@ -35,6 +35,8 @@ CHANNELS = (
     "C3",
     "Cz",
     "C4",
+    "CP4",
+    "CP3",
 )
 
 FREQUENCY_BANDS = {
@@ -49,7 +51,8 @@ TFR_FREQUENCIES = np.arange(
 )
 
 BASELINE = (-1.5, -0.5)
-IMAGERY_WINDOW = (0.5, 3.5)
+IMAGERY_WINDOW = (0.5, 4.0)
+IMAGERY_WINDOW_2 = (0.5, 3.5)
 
 # Internal class labels.
 CLASS_IDS = {
@@ -91,7 +94,7 @@ def generate_topographies(
         labels=labels,
         frequency_bands=FREQUENCY_BANDS,
         baseline=BASELINE,
-        imagery_window=IMAGERY_WINDOW,
+        imagery_window=IMAGERY_WINDOW_2,
     )
 
     figure = create_erd_topomap_figure(
@@ -100,7 +103,7 @@ def generate_topographies(
         band_names=list(FREQUENCY_BANDS),
         subject=subject,
         baseline=BASELINE,
-        imagery_window=IMAGERY_WINDOW,
+        imagery_window=IMAGERY_WINDOW_2,
     )
 
     try:

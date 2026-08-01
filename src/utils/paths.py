@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from src.utils.config import BASE_SEED
+from typing import Literal
 
 
 # Project directories
@@ -17,7 +18,13 @@ CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
 CSP_RESULTS_DIR = RESULTS_DIR / "csp_analysis"
+RELEVANCE_COMPARISON_RESULTS_DIR = RESULTS_DIR / "relevance_comparison"
 
+
+RelevanceMethod = Literal[
+    "shap",
+    "csp",
+]
 
 # Create output directories
 for directory in (
@@ -28,6 +35,7 @@ for directory in (
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
     CSP_RESULTS_DIR,
+    RELEVANCE_COMPARISON_RESULTS_DIR,
 ):
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -428,3 +436,207 @@ def get_csp_topographies_path(
     path = _create_directory(CSP_RESULTS_DIR / "topographies")
     
     return path / f"{subject_name}_csp_topographies.png"
+
+
+def _get_group_relevance_comparison_dir(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the group-level relevance directory for one method.
+    """
+    return _create_directory(
+        RELEVANCE_COMPARISON_RESULTS_DIR
+        / f"group_{method}"
+    )
+
+
+def _get_shap_vs_csp_comparison_dir() -> Path:
+    """
+    Return the SHAP versus CSP+LDA comparison directory.
+    """
+    return _create_directory(
+        RELEVANCE_COMPARISON_RESULTS_DIR
+        / "shap_vs_csp"
+    )
+
+
+def get_group_mean_channel_relevance_figure_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the group mean channel-relevance figure path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "mean_channel_relevance.png"
+    )
+
+
+def get_group_mean_channel_relevance_csv_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the group mean channel-relevance CSV path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "mean_channel_relevance.csv"
+    )
+
+
+def get_group_channel_variability_figure_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the between-subject channel-variability figure path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "channel_variability.png"
+    )
+
+
+def get_group_mean_temporal_relevance_figure_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the group mean temporal-relevance figure path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "mean_temporal_relevance.png"
+    )
+
+
+def get_group_global_channel_rankings_csv_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the global channel-rankings CSV path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "global_channel_rankings.csv"
+    )
+
+
+def get_group_top5_channel_frequency_figure_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the top-five channel-frequency figure path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "top5_channel_frequency.png"
+    )
+
+
+def get_group_top5_channel_frequency_csv_path(
+    method: RelevanceMethod,
+) -> Path:
+    """
+    Return the top-five channel-frequency CSV path.
+    """
+    output_dir = (
+        _get_group_relevance_comparison_dir(
+            method
+        )
+    )
+
+    return (
+        output_dir
+        / "top5_channel_frequency.csv"
+    )
+
+
+def get_subject_channel_spearman_csv_path() -> Path:
+    """
+    Return the subject-wise SHAP–CSP channel Spearman CSV path.
+    """
+    output_dir = (
+        _get_shap_vs_csp_comparison_dir()
+    )
+
+    return (
+        output_dir
+        / "subject_channel_spearman.csv"
+    )
+
+
+def get_group_channel_spearman_csv_path() -> Path:
+    """
+    Return the group-level SHAP–CSP channel Spearman CSV path.
+    """
+    output_dir = (
+        _get_shap_vs_csp_comparison_dir()
+    )
+
+    return (
+        output_dir
+        / "group_channel_spearman.csv"
+    )
+
+
+def get_subject_top5_overlap_csv_path() -> Path:
+    """
+    Return the subject-wise SHAP–CSP top-five overlap CSV path.
+    """
+    output_dir = (
+        _get_shap_vs_csp_comparison_dir()
+    )
+
+    return (
+        output_dir
+        / "subject_top5_overlap.csv"
+    )
+
+
+def get_group_top5_overlap_csv_path() -> Path:
+    """
+    Return the group-level SHAP–CSP top-five overlap CSV path.
+    """
+    output_dir = (
+        _get_shap_vs_csp_comparison_dir()
+    )
+
+    return (
+        output_dir
+        / "group_top5_overlap.csv"
+    )

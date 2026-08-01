@@ -16,6 +16,7 @@ ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
 CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
+CSP_RESULTS_DIR = RESULTS_DIR / "csp_analysis"
 
 
 # Create output directories
@@ -26,6 +27,7 @@ for directory in (
     CONFUSION_MATRIX_RESULTS_DIR,
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
+    CSP_RESULTS_DIR,
 ):
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -346,3 +348,83 @@ def get_shap_channel_relevance_path(
     path = _create_directory(SHAP_RESULTS_DIR / "channel_relevance")
     
     return path / f"{subject_name}_shap_channel_relevance.png"
+
+
+def get_csp_values_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    output_dir = _create_directory(
+        CSP_RESULTS_DIR / "values"
+    )
+
+    return output_dir / f"{subject_name}_csp_values.npz"
+
+
+def get_csp_channel_time_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(CSP_RESULTS_DIR / "channel_time")
+    
+    return path / f"{subject_name}_csp_channel_time.png"
+
+
+def get_csp_channel_relevance_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(CSP_RESULTS_DIR / "channel_relevance")
+    
+    return path / f"{subject_name}_csp_channel_relevance.png"
+
+
+def get_csp_channel_rankings_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(CSP_RESULTS_DIR / "channel_rankings")
+    
+    return path / f"{subject_name}_csp_channel_rankings.png"
+
+
+def get_csp_temporal_relevance_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(CSP_RESULTS_DIR / "temporal_relevance")
+    
+    return path / f"{subject_name}_csp_temporal.png"
+
+
+def get_csp_topographies_path(
+    subject: int,
+) -> Path:
+    """
+    CSP
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(CSP_RESULTS_DIR / "topographies")
+    
+    return path / f"{subject_name}_csp_topographies.png"

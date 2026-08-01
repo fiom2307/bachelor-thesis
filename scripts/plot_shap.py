@@ -2,14 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from src.analysis.shap_analysis import (
+    compute_channel_shap_relevance,
     compute_class_shap_relevance,
     compute_eegnet_ensemble_shap,
     compute_temporal_shap_relevance,
     compute_topographic_shap_relevance,
     count_shap_trials_by_class,
-    select_shap_background,
-    save_shap_result,
     load_shap_result,
+    rank_shap_channels,
+    save_shap_result,
+    select_shap_background,
 )
 from src.data.dataset import (
     get_data_for_subject,
@@ -21,19 +23,21 @@ from src.models.eegnet import (
     train_or_load_eegnet,
 )
 from src.utils.paths import (
+    get_shap_channel_rankings_path,
+    get_shap_channel_relevance_path,
     get_shap_channel_time_path,
     get_shap_temporal_relevance_path,
     get_shap_topographies_path,
+    get_shap_values_path,
 )
 from src.visualization.common import save_figure
 from src.visualization.shap_plots import (
+    plot_shap_channel_rankings,
+    plot_shap_channel_relevance,
     plot_shap_channel_time,
     plot_shap_temporal_relevance,
     plot_shap_topographies,
 )
-from src.analysis.shap_analysis import SHAPResult
-from src.utils.paths import get_shap_values_path
-from pathlib import Path
 
 
 N_BACKGROUND_SAMPLES = 40
@@ -103,6 +107,10 @@ def plot_shap_for_subject(
             output_file=shap_file,
         )
 
+    epochs, _ = get_evaluation_erd_epochs_for_subject(
+        subject
+    )
+
     class_labels = list(CLASS_LABELS)
 
     class_relevance = compute_class_shap_relevance(
@@ -111,12 +119,17 @@ def plot_shap_for_subject(
         correct_only=True,
     )
 
-    temporal_relevance = compute_temporal_shap_relevance(
-        class_relevance,
+    channel_relevance = compute_channel_shap_relevance(
+        class_relevance
     )
 
-    epochs, _ = get_evaluation_erd_epochs_for_subject(
-        subject
+    channel_rankings = rank_shap_channels(
+        channel_relevance=channel_relevance,
+        channel_names=epochs.ch_names,
+    )
+
+    temporal_relevance = compute_temporal_shap_relevance(
+        class_relevance,
     )
 
     times = (
@@ -145,6 +158,18 @@ def plot_shap_for_subject(
         trial_counts=trial_counts,
     )
 
+    channel_relevance_figure = plot_shap_channel_relevance(
+        channel_relevance=channel_relevance,
+        channel_names=epochs.ch_names,
+        trial_counts=trial_counts,
+    )
+
+    channel_rankings_figure = plot_shap_channel_rankings(
+        channel_rankings=channel_rankings,
+        top_n=10,
+        trial_counts=trial_counts,
+    )
+
     temporal_figure = plot_shap_temporal_relevance(
         temporal_relevance=temporal_relevance,
         times=times,
@@ -165,6 +190,16 @@ def plot_shap_for_subject(
     )
 
     save_figure(
+        channel_relevance_figure,
+        get_shap_channel_relevance_path(subject),
+    )
+
+    save_figure(
+        channel_rankings_figure,
+        get_shap_channel_rankings_path(subject),
+    )
+
+    save_figure(
         temporal_figure,
         get_shap_temporal_relevance_path(subject),
     )
@@ -175,6 +210,8 @@ def plot_shap_for_subject(
     )
 
     plt.close(channel_time_figure)
+    plt.close(channel_relevance_figure)
+    plt.close(channel_rankings_figure)
     plt.close(temporal_figure)
     plt.close(topographies_figure)
 

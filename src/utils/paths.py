@@ -320,3 +320,29 @@ def get_shap_values_path(
     )
 
     return output_dir / f"{subject_name}_shap_values.npz"
+
+
+def get_shap_channel_rankings_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(SHAP_RESULTS_DIR / "channel_rankings")
+    
+    return path / f"{subject_name}_shap_channel_rankings.png"
+
+
+def get_shap_channel_relevance_path(
+    subject: int,
+) -> Path:
+    """
+    TODO
+    """
+    subject_name = get_subject_name(subject)
+
+    path = _create_directory(SHAP_RESULTS_DIR / "channel_relevance")
+    
+    return path / f"{subject_name}_shap_channel_relevance.png"

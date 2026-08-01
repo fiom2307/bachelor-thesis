@@ -14,6 +14,10 @@ from src.data.labels import (
 ChannelTimeRelevance = Mapping[int, np.ndarray]
 VectorRelevance = Mapping[int, np.ndarray]
 TrialCounts = Mapping[int, int]
+ChannelRankings = Mapping[
+    int,
+    list[tuple[str, float]],
+]
 
 
 def plot_shap_channel_time(
@@ -257,6 +261,184 @@ def plot_shap_topographies(
     figure.suptitle(
         "EEGNet SHAP topographies "
         f"({window_start:.1f}–{window_end:.1f} s)",
+        fontsize=15,
+    )
+
+    return figure
+
+
+def plot_shap_channel_relevance(
+    channel_relevance: VectorRelevance,
+    channel_names: list[str],
+    trial_counts: TrialCounts | None = None,
+) -> Figure:
+    """
+    Plot a class-by-channel SHAP relevance heatmap.
+    """
+    class_ids = _get_class_ids(
+        channel_relevance
+    )
+
+    relevance_matrix = np.stack([
+        channel_relevance[class_id]
+        for class_id in class_ids
+    ])
+
+    if relevance_matrix.shape[1] != len(channel_names):
+        raise ValueError(
+            "The number of relevance values must match "
+            "the number of channel names."
+        )
+
+    figure, axis = plt.subplots(
+        figsize=(15, 5),
+        constrained_layout=True,
+    )
+
+    maximum_relevance = float(
+        np.max(relevance_matrix)
+    )
+
+    image = axis.imshow(
+        relevance_matrix,
+        aspect="auto",
+        interpolation="nearest",
+        cmap="viridis",
+        vmin=0.0,
+        vmax=max(
+            maximum_relevance,
+            np.finfo(float).eps,
+        ),
+    )
+
+    axis.set_xticks(
+        np.arange(len(channel_names))
+    )
+
+    axis.set_xticklabels(
+        channel_names,
+        rotation=45,
+        ha="right",
+    )
+
+    axis.set_yticks(
+        np.arange(len(class_ids))
+    )
+
+    axis.set_yticklabels([
+        _get_class_title(
+            class_id,
+            trial_counts,
+        )
+        for class_id in class_ids
+    ])
+
+    axis.set_title(
+        "Class-wise EEG channel SHAP relevance"
+    )
+
+    axis.set_xlabel(
+        "EEG channel"
+    )
+
+    axis.set_ylabel(
+        "Motor-imagery class"
+    )
+
+    colorbar = figure.colorbar(
+        image,
+        ax=axis,
+        shrink=0.9,
+    )
+
+    colorbar.set_label(
+        "Mean absolute SHAP value"
+    )
+
+    return figure
+
+
+def plot_shap_channel_rankings(
+    channel_rankings: ChannelRankings,
+    top_n: int = 10,
+    trial_counts: TrialCounts | None = None,
+) -> Figure:
+    """
+    Plot the highest-ranked EEG channels for each class.
+    """
+    if top_n <= 0:
+        raise ValueError(
+            "top_n must be greater than zero."
+        )
+
+    class_ids = [
+        class_id
+        for class_id in CLASS_LABELS
+        if class_id in channel_rankings
+    ]
+
+    figure, axes = plt.subplots(
+        nrows=2,
+        ncols=2,
+        figsize=(13, 10),
+        constrained_layout=True,
+    )
+
+    axes = axes.ravel()
+
+    for axis, class_id in zip(
+        axes,
+        class_ids,
+        strict=False,
+    ):
+        ranking = channel_rankings[
+            class_id
+        ][:top_n]
+
+        channel_names = [
+            channel_name
+            for channel_name, _
+            in ranking
+        ]
+
+        relevance_values = [
+            relevance
+            for _, relevance
+            in ranking
+        ]
+
+        axis.barh(
+            channel_names,
+            relevance_values,
+        )
+
+        axis.invert_yaxis()
+
+        axis.set_title(
+            _get_class_title(
+                class_id,
+                trial_counts,
+            )
+        )
+
+        axis.set_xlabel(
+            "Mean absolute SHAP value"
+        )
+
+        axis.set_ylabel(
+            "EEG channel"
+        )
+
+        axis.grid(
+            axis="x",
+            alpha=0.25,
+        )
+
+    for axis in axes[len(class_ids):]:
+        axis.set_visible(False)
+
+    figure.suptitle(
+        f"Top {top_n} EEG channels by SHAP relevance",
         fontsize=15,
     )
 

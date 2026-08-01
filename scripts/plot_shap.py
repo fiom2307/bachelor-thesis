@@ -8,6 +8,8 @@ from src.analysis.shap_analysis import (
     compute_topographic_shap_relevance,
     count_shap_trials_by_class,
     select_shap_background,
+    save_shap_result,
+    load_shap_result,
 )
 from src.data.dataset import (
     get_data_for_subject,
@@ -39,34 +41,6 @@ SHAP_NSAMPLES = 20
 
 EPOCH_TMIN = 0.5
 IMAGERY_WINDOW = (0.5, 4)
-
-
-def save_shap_result(
-    result: SHAPResult,
-    output_file: Path,
-) -> None:
-    """Save computed SHAP values."""
-    np.savez_compressed(
-        output_file,
-        values=result.values,
-        probabilities=result.probabilities,
-        predictions=result.predictions,
-        labels=result.labels,
-    )
-
-
-def load_shap_result(
-    input_file: Path,
-) -> SHAPResult:
-    """Load previously computed SHAP values."""
-    data = np.load(input_file)
-
-    return SHAPResult(
-        values=data["values"],
-        probabilities=data["probabilities"],
-        predictions=data["predictions"],
-        labels=data["labels"],
-    )
 
 
 def plot_shap_for_subject(

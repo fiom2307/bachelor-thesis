@@ -25,22 +25,6 @@ def plot_shap_channel_time(
 ) -> Figure:
     """
     Plot class-wise SHAP relevance across EEG channels and time.
-
-    Args:
-        class_relevance:
-            Mean absolute SHAP relevance for each class, with shape
-            (n_channels, n_times).
-        times:
-            Time value corresponding to each sample.
-        channel_names:
-            EEG channel names.
-        imagery_window:
-            Start and end of the motor-imagery interval.
-        trial_counts:
-            Optional number of included trials for each class.
-
-    Returns:
-        The generated Matplotlib figure.
     """
     class_ids = _get_class_ids(class_relevance)
 
@@ -137,19 +121,6 @@ def plot_shap_temporal_relevance(
 ) -> Figure:
     """
     Plot temporal SHAP relevance averaged across EEG channels.
-
-    Args:
-        temporal_relevance:
-            Temporal relevance curve for each class, with shape (n_times,).
-        times:
-            Time value corresponding to each sample.
-        imagery_window:
-            Start and end of the motor-imagery interval.
-        trial_counts:
-            Optional number of included trials for each class.
-
-    Returns:
-        The generated Matplotlib figure.
     """
     class_ids = _get_class_ids(
         temporal_relevance
@@ -213,21 +184,6 @@ def plot_shap_topographies(
 ) -> Figure:
     """
     Plot class-wise scalp topographies of SHAP relevance.
-
-    Args:
-        topographic_relevance:
-            Mean absolute SHAP relevance per channel for each class.
-        info:
-            MNE Info object containing the EEG montage.
-        imagery_window:
-            Interval over which the relevance was averaged.
-        trial_counts:
-            Optional number of included trials for each class.
-        show_channel_names:
-            Whether to display channel names.
-
-    Returns:
-        The generated Matplotlib figure.
     """
     class_ids = _get_class_ids(
         topographic_relevance

@@ -272,7 +272,7 @@ def get_shap_channel_time_path(
     subject: int,
 ) -> Path:
     """
-    TODO
+    Return the SHAP channel-time plot path for one subject.
     """
     subject_name = get_subject_name(subject)
 
@@ -285,7 +285,7 @@ def get_shap_temporal_relevance_path(
     subject: int,
 ) -> Path:
     """
-    TODO
+    Return the SHAP temporal relevance plot path for one subject.
     """
     subject_name = get_subject_name(subject)
 
@@ -298,7 +298,7 @@ def get_shap_topographies_path(
     subject: int,
 ) -> Path:
     """
-    TODO
+    Return the SHAP topographies plot path for one subject.
     """
     subject_name = get_subject_name(subject)
 
@@ -306,10 +306,13 @@ def get_shap_topographies_path(
     
     return path / f"{subject_name}_shap_topographies.png"
 
+
 def get_shap_values_path(
     subject: int,
 ) -> Path:
-    """Return the saved SHAP values path."""
+    """
+    Return the saved SHAP values path.
+    """
     subject_name = get_subject_name(subject)
 
     output_dir = _create_directory(

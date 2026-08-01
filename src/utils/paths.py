@@ -15,7 +15,7 @@ CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
 CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
-SHAP_RESULTS_DIR = RESULTS_DIR / "shap"
+SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
 
 
 # Create output directories

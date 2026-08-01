@@ -295,7 +295,7 @@ def main() -> None:
     """Generate SHAP plots for all subjects."""
     for subject in range(
         1,
-        2,
+        10,
     ):
         plot_shap_for_subject(
             subject

@@ -290,7 +290,7 @@ def main() -> None:
     """
     for subject in range(
         1,
-        2,
+        10,
     ):
         plot_csp_for_subject(
             subject

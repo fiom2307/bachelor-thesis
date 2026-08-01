@@ -26,7 +26,7 @@ from src.visualization.spectral import (
 
 
 # Subjects A01–A09.
-SUBJECTS = range(1, 2)
+SUBJECTS = range(1, 10)
 
 # C3: right-hand imagery.
 # Cz: feet imagery.

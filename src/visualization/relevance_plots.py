@@ -18,6 +18,11 @@ RelevanceMethod = Literal[
     "csp",
 ]
 
+TrialSelection = Literal[
+    "correct",
+    "incorrect",
+]
+
 ChannelTimeRelevance = Mapping[
     int,
     np.ndarray,
@@ -109,6 +114,8 @@ def plot_channel_time_relevance(
     times: np.ndarray,
     channel_names: list[str],
     method: RelevanceMethod,
+    trial_selection: TrialSelection,
+    subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
@@ -234,7 +241,11 @@ def plot_channel_time_relevance(
         )
 
     figure.suptitle(
-        config.channel_time_title,
+        _build_title(
+            base_title=config.channel_time_title,
+            trial_selection=trial_selection,
+            subject=subject,
+        ),
         fontsize=15,
     )
 
@@ -245,6 +256,8 @@ def plot_temporal_relevance(
     temporal_relevance: VectorRelevance,
     times: np.ndarray,
     method: RelevanceMethod,
+    trial_selection: TrialSelection,
+    subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
@@ -295,7 +308,11 @@ def plot_temporal_relevance(
     )
 
     axis.set_title(
-        config.temporal_title
+        _build_title(
+            base_title=config.temporal_title,
+            trial_selection=trial_selection,
+            subject=subject,
+        )
     )
 
     axis.set_xlabel(
@@ -326,6 +343,8 @@ def plot_topographies(
     topographic_relevance: VectorRelevance,
     info: mne.Info,
     method: RelevanceMethod,
+    trial_selection: TrialSelection,
+    subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
     show_channel_names: bool = False,
@@ -436,8 +455,14 @@ def plot_topographies(
     )
 
     figure.suptitle(
-        f"{config.topographies_title} "
-        f"({window_start:.1f}–{window_end:.1f} s)",
+        _build_title(
+            base_title=(
+                f"{config.topographies_title} "
+                f"({window_start:.1f}–{window_end:.1f} s)"
+            ),
+            trial_selection=trial_selection,
+            subject=subject,
+        ),
         fontsize=15,
     )
 
@@ -448,6 +473,8 @@ def plot_channel_relevance(
     channel_relevance: VectorRelevance,
     channel_names: list[str],
     method: RelevanceMethod,
+    trial_selection: TrialSelection,
+    subject: int | None,
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
     """
@@ -530,7 +557,11 @@ def plot_channel_relevance(
     ])
 
     axis.set_title(
-        config.channel_relevance_title
+        _build_title(
+            base_title=config.channel_relevance_title,
+            trial_selection=trial_selection,
+            subject=subject,
+        )
     )
 
     axis.set_xlabel(
@@ -557,6 +588,8 @@ def plot_channel_relevance(
 def plot_channel_rankings(
     channel_rankings: ChannelRankings,
     method: RelevanceMethod,
+    trial_selection: TrialSelection,
+    subject: int | None,
     top_n: int = 10,
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
@@ -645,8 +678,14 @@ def plot_channel_rankings(
         axis.set_visible(False)
 
     figure.suptitle(
-        f"Top {top_n} EEG channels by "
-        f"{config.ranking_method_name}",
+        _build_title(
+            base_title=(
+                f"Top {top_n} EEG channels by "
+                f"{config.ranking_method_name}"
+            ),
+            trial_selection=trial_selection,
+            subject=subject,
+        ),
         fontsize=15,
     )
 
@@ -750,3 +789,68 @@ def _mark_imagery_window(
         linewidth=1,
         alpha=0.8,
     )
+
+
+def _get_trial_selection_label(
+    trial_selection: TrialSelection,
+) -> str:
+    """
+    Return the readable label for one trial subset.
+    """
+    labels = {
+        "correct": "correct trials",
+        "incorrect": "incorrect trials",
+    }
+
+    try:
+        return labels[
+            trial_selection
+        ]
+    except KeyError as error:
+        raise ValueError(
+            f"Unsupported trial selection: {trial_selection}"
+        ) from error
+
+
+def _get_result_scope_label(
+    subject: int | None,
+) -> str:
+    """
+    Return whether the result is subject-wise or mean across subjects.
+    """
+    if subject is None:
+        return "mean across subjects"
+
+    return f"{_get_subject_name(subject)}"
+
+
+def _build_title(
+    base_title: str,
+    trial_selection: TrialSelection,
+    subject: int | None,
+) -> str:
+    """
+    Build a title including method-specific title, trial subset,
+    and subject/global scope.
+    """
+    trial_label = _get_trial_selection_label(
+        trial_selection
+    )
+
+    scope_label = _get_result_scope_label(
+        subject
+    )
+
+    return (
+        f"{base_title}\n"
+        f"({trial_label}, {scope_label})"
+    )
+
+
+def _get_subject_name(
+    subject: int,
+) -> str:
+    """
+    Return the formatted subject name.
+    """
+    return f"A{subject:02d}"

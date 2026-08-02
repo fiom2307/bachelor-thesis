@@ -25,6 +25,11 @@ class SHAPResult:
         """Return correctly classified trials."""
         return self.predictions == self.labels
 
+    @property
+    def incorrect_mask(self) -> np.ndarray:
+        """Return incorrectly classified trials."""
+        return self.predictions != self.labels
+
 
 def select_shap_background(
     data: np.ndarray,

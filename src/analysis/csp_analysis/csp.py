@@ -35,6 +35,11 @@ class CSPAnalysisResult:
         """Return correctly classified trials."""
         return self.predictions == self.labels
 
+    @property
+    def incorrect_mask(self) -> np.ndarray:
+        """Return incorrectly classified trials."""
+        return self.predictions != self.labels
+
 
 def compute_occlusion_reference(
     data: np.ndarray,
@@ -61,6 +66,11 @@ def compute_csp_lda_ensemble_occlusion(
     """
     Compute and average occlusion relevance across CSP+LDA folds.
     """
+    if not models:
+        raise ValueError(
+            "No CSP+LDA fold models were provided."
+        )
+
     fold_values = []
     fold_probabilities = []
 
@@ -91,6 +101,14 @@ def compute_csp_lda_ensemble_occlusion(
 
         if window_times is None:
             window_times = times
+        elif not np.array_equal(
+            window_times,
+            times,
+        ):
+            raise ValueError(
+                "Occlusion-window times differ "
+                "between CSP+LDA folds."
+            )
 
     mean_values = np.mean(
         fold_values,
@@ -112,13 +130,15 @@ def compute_csp_lda_ensemble_occlusion(
 
     if window_times is None:
         raise ValueError(
-            "No CSP+LDA fold models were provided."
+            "Occlusion-window times were not computed."
         )
 
     return CSPAnalysisResult(
         values=mean_values,
         probabilities=mean_probabilities,
         predictions=predictions,
-        labels=labels,
+        labels=np.asarray(
+            labels
+        ),
         times=window_times,
     )

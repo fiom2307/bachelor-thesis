@@ -2,7 +2,7 @@ from typing import Literal
 
 import numpy as np
 
-from src.analysis.shap_analysis.eegnet import SHAPResult
+from analysis.shap_analysis.shap_analysis import SHAPResult
 
 
 TrialSelection = Literal[

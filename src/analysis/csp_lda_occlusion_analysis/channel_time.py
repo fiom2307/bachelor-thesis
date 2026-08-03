@@ -2,7 +2,7 @@ from typing import Literal
 
 import numpy as np
 
-from src.analysis.csp_lda_occlusion_analysis.csp import (
+from analysis.csp_lda_occlusion_analysis.occlusion_analysis import (
     CSPAnalysisResult,
 )
 

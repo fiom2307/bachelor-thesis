@@ -6,7 +6,7 @@ from src.analysis.csp_lda_occlusion_analysis.channel_time import (
     compute_class_csp_relevance,
     count_csp_trials_by_class,
 )
-from src.analysis.csp_lda_occlusion_analysis.csp import (
+from analysis.csp_lda_occlusion_analysis.occlusion_analysis import (
     CSPFoldModel,
     CSPAnalysisResult,
     compute_csp_lda_ensemble_occlusion,

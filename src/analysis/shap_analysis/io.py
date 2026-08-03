@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.analysis.shap_analysis.eegnet import SHAPResult
+from analysis.shap_analysis.shap_analysis import SHAPResult
 
 
 def save_shap_result(

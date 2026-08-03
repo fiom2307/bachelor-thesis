@@ -2,7 +2,7 @@ from src.analysis.shap_analysis.channel_time import (
     compute_class_shap_relevance,
     count_shap_trials_by_class,
 )
-from src.analysis.shap_analysis.eegnet import (
+from analysis.shap_analysis.shap_analysis import (
     SHAPResult,
     compute_eegnet_ensemble_shap,
     select_shap_background,

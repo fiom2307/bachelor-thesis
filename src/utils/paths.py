@@ -19,7 +19,7 @@ CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
-CSP_RESULTS_DIR = RESULTS_DIR / "csp_analysis"
+CSP_RESULTS_DIR = RESULTS_DIR / "csp_lda_occlusion_analysis"
 
 
 RelevanceMethod = Literal[

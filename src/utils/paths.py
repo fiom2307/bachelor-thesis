@@ -20,6 +20,7 @@ SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
 CSP_RESULTS_DIR = RESULTS_DIR / "csp_lda_occlusion_analysis"
+CSP_PATTERN_RESULTS_DIR = RESULTS_DIR / "csp_pattern_analysis"
 
 
 RelevanceMethod = Literal[
@@ -50,6 +51,7 @@ for directory in (
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
     CSP_RESULTS_DIR,
+    CSP_PATTERN_RESULTS_DIR,
 ):
     directory.mkdir(
         parents=True,
@@ -671,4 +673,45 @@ def get_csp_channel_relevance_path(
         plot_type="channel_relevance",
         subject=subject,
         trial_selection=trial_selection,
+    )
+
+
+def get_csp_pattern_values_path(
+    subject: int,
+) -> Path:
+    """
+    Return the saved CSP spatial-pattern values path.
+    """
+    subject_name = get_subject_name(
+        subject
+    )
+
+    output_dir = _create_directory(
+        CSP_PATTERN_RESULTS_DIR / "values"
+    )
+
+    return (
+        output_dir
+        / f"{subject_name}_csp_patterns.npz"
+    )
+
+
+def get_csp_subject_patterns_path(
+    subject: int,
+) -> Path:
+    """
+    Return the CSP spatial-pattern figure path for one subject.
+    """
+    subject_name = get_subject_name(
+        subject
+    )
+
+    output_dir = _create_directory(
+        CSP_PATTERN_RESULTS_DIR
+        / "subject_patterns"
+    )
+
+    return (
+        output_dir
+        / f"{subject_name}_csp_patterns.png"
     )

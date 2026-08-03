@@ -6,7 +6,7 @@ from sklearn.discriminant_analysis import (
     LinearDiscriminantAnalysis,
 )
 
-from src.analysis.csp_analysis._utils import (
+from src.analysis.csp_lda_occlusion_analysis._utils import (
     compute_model_occlusion,
 )
 from src.data.labels import CLASS_LABELS

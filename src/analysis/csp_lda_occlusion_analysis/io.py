@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.analysis.csp_analysis.csp import (
+from src.analysis.csp_lda_occlusion_analysis.csp import (
     CSPAnalysisResult,
 )
 

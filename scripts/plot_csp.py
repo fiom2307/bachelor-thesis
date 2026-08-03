@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import mne
 import numpy as np
 
-from src.analysis.csp_analysis import (
+from src.analysis.csp_lda_occlusion_analysis import (
     compute_channel_csp_relevance,
     compute_class_csp_relevance,
     compute_csp_lda_ensemble_occlusion,

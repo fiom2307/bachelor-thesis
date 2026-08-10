@@ -3,20 +3,19 @@ from dataclasses import dataclass
 import numpy as np
 from tensorflow import keras
 
-from src.analysis.shap_analysis._utils import (
+from src.analysis.shap_analysis.time_domain._utils import (
     compute_model_shap,
 )
 from src.utils.config import BASE_SEED
 
 
 @dataclass(frozen=True)
-class SHAPResult:
+class TimeDomainSHAPResult:
     """
-    SHAP results for one subject.
+    Time-domain SHAP results for one subject.
     """
 
     values: np.ndarray
-    probabilities: np.ndarray
     predictions: np.ndarray
     labels: np.ndarray
 
@@ -83,7 +82,7 @@ def compute_eegnet_ensemble_shap(
     nsamples: int = 200,
     batch_size: int = 16,
     seed: int = BASE_SEED,
-) -> SHAPResult:
+) -> TimeDomainSHAPResult:
     """
     Compute and average SHAP values across EEGNet fold models.
     """
@@ -128,9 +127,8 @@ def compute_eegnet_ensemble_shap(
         axis=0,
     )
 
-    return SHAPResult(
+    return TimeDomainSHAPResult(
         values=mean_shap_values,
-        probabilities=mean_probabilities,
         predictions=mean_probabilities.argmax(axis=1),
         labels=labels,
     )

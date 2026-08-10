@@ -6,14 +6,16 @@ import numpy as np
 
 from src.analysis.shap_analysis import (
     compute_channel_shap_relevance,
-    compute_class_shap_relevance,
     compute_eegnet_ensemble_shap,
+    compute_eegnet_frequency_shap,
+    compute_frequency_shap_relevance,
     compute_temporal_shap_relevance,
     compute_topographic_shap_relevance,
-    count_shap_trials_by_class,
-    load_shap_result,
+    load_frequency_domain_shap_result,
+    load_time_domain_shap_result,
     rank_shap_channels,
-    save_shap_result,
+    save_frequency_domain_shap_result,
+    save_time_domain_shap_result,
     select_shap_background,
 )
 from src.data.dataset import (
@@ -29,18 +31,19 @@ from src.models.eegnet import (
     train_or_load_eegnet,
 )
 from src.utils.paths import (
+    get_frequency_domain_shap_values_path,
     get_shap_channel_rankings_path,
     get_shap_channel_relevance_path,
-    get_shap_channel_time_path,
+    get_shap_frequency_relevance_path,
     get_shap_temporal_relevance_path,
     get_shap_topographies_path,
-    get_shap_values_path,
+    get_time_domain_shap_values_path,
 )
 from src.visualization.common import save_figure
-from src.visualization.relevance_plots import (
+from src.visualization.shap_plots import (
     plot_channel_rankings,
     plot_channel_relevance,
-    plot_channel_time_relevance,
+    plot_frequency_relevance,
     plot_temporal_relevance,
     plot_topographies,
 )
@@ -51,7 +54,12 @@ TrialSelection = Literal[
     "incorrect",
 ]
 
-ChannelTimeRelevance = Mapping[
+ClassRelevance = Mapping[
+    int,
+    np.ndarray,
+]
+
+VectorRelevance = Mapping[
     int,
     np.ndarray,
 ]
@@ -63,12 +71,17 @@ TrialCounts = Mapping[
 
 
 N_BACKGROUND_SAMPLES = 40
-SHAP_NSAMPLES = 20
+
+TIME_SHAP_NSAMPLES = 20
+FREQUENCY_SHAP_NSAMPLES = 256
 
 EPOCH_TMIN = 0.5
 IMAGERY_WINDOW = (0.5, 4.0)
 
-TRIAL_SELECTIONS: tuple[TrialSelection, ...] = (
+TRIAL_SELECTIONS: tuple[
+    TrialSelection,
+    ...,
+] = (
     "correct",
     "incorrect",
 )
@@ -76,12 +89,20 @@ TRIAL_SELECTIONS: tuple[TrialSelection, ...] = (
 
 def plot_shap_for_subject(
     subject: int,
-) -> dict[TrialSelection, tuple[ChannelTimeRelevance, TrialCounts]] | None:
+) -> dict[
+    TrialSelection,
+    tuple[
+        ClassRelevance,
+        VectorRelevance,
+        TrialCounts,
+    ],
+] | None:
     """
     Compute and save EEGNet SHAP plots for one subject.
 
-    Returns class-wise relevance and trial counts for each trial selection
-    so they can later be aggregated into global mean plots.
+    Returns time-domain class relevance, frequency-domain relevance,
+    and trial counts for each trial selection so they can later be
+    aggregated into global mean plots.
     """
     data = get_data_for_subject(
         subject
@@ -109,85 +130,154 @@ def plot_shap_for_subject(
         y_train,
     )
 
-    background = select_shap_background(
-        data=X_train,
-        labels=y_train,
-        n_samples=N_BACKGROUND_SAMPLES,
-    )
-
-    background_sets = [
-        background
-        for _ in models
-    ]
-
-    shap_file = get_shap_values_path(
-        subject
-    )
-
-    if shap_file.exists():
-        print(
-            f"Loading saved SHAP values: "
-            f"{shap_file}"
-        )
-
-        shap_result = load_shap_result(
-            shap_file
-        )
-    else:
-        print(
-            f"Computing SHAP values for "
-            f"A{subject:02d}..."
-        )
-
-        shap_result = compute_eegnet_ensemble_shap(
-            models=models,
-            background_sets=background_sets,
-            data=X_eval,
-            labels=y_eval,
-            nsamples=SHAP_NSAMPLES,
-        )
-
-        save_shap_result(
-            result=shap_result,
-            output_file=shap_file,
-        )
-
     epochs, _ = (
         get_evaluation_erd_epochs_for_subject(
             subject
         )
     )
 
-    class_labels = list(
-        CLASS_LABELS
+    sfreq = float(
+        epochs.info["sfreq"]
     )
 
     times = (
         np.arange(
             X_eval.shape[-1]
         )
-        / epochs.info["sfreq"]
+        / sfreq
         + EPOCH_TMIN
     )
 
-    subject_results: dict[
-        TrialSelection,
-        tuple[ChannelTimeRelevance, TrialCounts],
-    ] = {}
+    # ------------------------------------------------------------------
+    # Time-domain SHAP
+    # ------------------------------------------------------------------
 
-    for trial_selection in TRIAL_SELECTIONS:
-        class_relevance = (
-            compute_class_shap_relevance(
-                result=shap_result,
-                class_labels=class_labels,
-                trial_selection=trial_selection,
+    time_shap_file = (
+        get_time_domain_shap_values_path(
+            subject
+        )
+    )
+
+    if time_shap_file.exists():
+        print(
+            "Loading saved time-domain SHAP values: "
+            f"{time_shap_file}"
+        )
+
+        time_result = (
+            load_time_domain_shap_result(
+                time_shap_file
+            )
+        )
+    else:
+        background = select_shap_background(
+            data=X_train,
+            labels=y_train,
+            n_samples=N_BACKGROUND_SAMPLES,
+        )
+
+        background_sets = [
+            background
+            for _ in models
+        ]
+
+        print(
+            "Computing time-domain SHAP values for "
+            f"A{subject:02d}..."
+        )
+
+        time_result = (
+            compute_eegnet_ensemble_shap(
+                models=models,
+                background_sets=background_sets,
+                data=X_eval,
+                labels=y_eval,
+                nsamples=TIME_SHAP_NSAMPLES,
             )
         )
 
-        trial_counts = count_shap_trials_by_class(
-            result=shap_result,
-            class_labels=class_labels,
+        save_time_domain_shap_result(
+            result=time_result,
+            output_file=time_shap_file,
+        )
+
+    # ------------------------------------------------------------------
+    # Frequency-domain SHAP
+    # ------------------------------------------------------------------
+
+    frequency_shap_file = (
+        get_frequency_domain_shap_values_path(
+            subject
+        )
+    )
+
+    if frequency_shap_file.exists():
+        print(
+            "Loading saved frequency-domain SHAP values: "
+            f"{frequency_shap_file}"
+        )
+
+        frequency_result = (
+            load_frequency_domain_shap_result(
+                frequency_shap_file
+            )
+        )
+    else:
+        print(
+            "Computing frequency-domain SHAP values for "
+            f"A{subject:02d}..."
+        )
+
+        frequency_result = (
+            compute_eegnet_frequency_shap(
+                models=models,
+                data=X_eval,
+                labels=y_eval,
+                sfreq=sfreq,
+                nsamples=FREQUENCY_SHAP_NSAMPLES,
+            )
+        )
+
+        save_frequency_domain_shap_result(
+            result=frequency_result,
+            output_file=frequency_shap_file,
+        )
+
+    # ------------------------------------------------------------------
+    # Relevance analyses
+    # ------------------------------------------------------------------
+
+    subject_results: dict[
+        TrialSelection,
+        tuple[
+            ClassRelevance,
+            VectorRelevance,
+            TrialCounts,
+        ],
+    ] = {}
+
+    for trial_selection in TRIAL_SELECTIONS:
+        time_trial_mask = _get_trial_mask(
+            result=time_result,
             trial_selection=trial_selection,
+        )
+
+        frequency_trial_mask = _get_trial_mask(
+            result=frequency_result,
+            trial_selection=trial_selection,
+        )
+
+        class_relevance = (
+            _compute_class_shap_relevance(
+                shap_values=time_result.values,
+                labels=time_result.labels,
+                trial_mask=time_trial_mask,
+            )
+        )
+
+        trial_counts = _count_trials_by_class(
+            labels=time_result.labels,
+            trial_mask=time_trial_mask,
         )
 
         if not class_relevance:
@@ -196,6 +286,14 @@ def plot_shap_for_subject(
                 f"no {trial_selection} trials available."
             )
             continue
+
+        frequency_relevance = (
+            compute_frequency_shap_relevance(
+                shap_values=frequency_result.values,
+                labels=frequency_result.labels,
+                trial_mask=frequency_trial_mask,
+            )
+        )
 
         channel_relevance = (
             compute_channel_shap_relevance(
@@ -222,24 +320,14 @@ def plot_shap_for_subject(
             )
         )
 
-        channel_time_figure = (
-            plot_channel_time_relevance(
-                class_relevance=class_relevance,
-                times=times,
-                channel_names=epochs.ch_names,
-                method="shap",
-                trial_selection=trial_selection,
-                subject=subject,
-                imagery_window=IMAGERY_WINDOW,
-                trial_counts=trial_counts,
-            )
-        )
+        # --------------------------------------------------------------
+        # Subject-wise plots
+        # --------------------------------------------------------------
 
         channel_relevance_figure = (
             plot_channel_relevance(
                 channel_relevance=channel_relevance,
                 channel_names=epochs.ch_names,
-                method="shap",
                 trial_selection=trial_selection,
                 subject=subject,
                 trial_counts=trial_counts,
@@ -249,7 +337,6 @@ def plot_shap_for_subject(
         channel_rankings_figure = (
             plot_channel_rankings(
                 channel_rankings=channel_rankings,
-                method="shap",
                 trial_selection=trial_selection,
                 subject=subject,
                 top_n=10,
@@ -261,7 +348,6 @@ def plot_shap_for_subject(
             plot_temporal_relevance(
                 temporal_relevance=temporal_relevance,
                 times=times,
-                method="shap",
                 trial_selection=trial_selection,
                 subject=subject,
                 imagery_window=IMAGERY_WINDOW,
@@ -269,22 +355,29 @@ def plot_shap_for_subject(
             )
         )
 
-        topographies_figure = plot_topographies(
-            topographic_relevance=topographic_relevance,
-            info=epochs.info,
-            method="shap",
-            trial_selection=trial_selection,
-            subject=subject,
-            imagery_window=IMAGERY_WINDOW,
-            trial_counts=trial_counts,
+        frequency_figure = (
+            plot_frequency_relevance(
+                frequency_relevance=frequency_relevance,
+                frequency_bands=(
+                    frequency_result.frequency_bands
+                ),
+                trial_selection=trial_selection,
+                subject=subject,
+                trial_counts=trial_counts,
+            )
         )
 
-        save_figure(
-            channel_time_figure,
-            get_shap_channel_time_path(
-                subject=subject,
+        topographies_figure = (
+            plot_topographies(
+                topographic_relevance=(
+                    topographic_relevance
+                ),
+                info=epochs.info,
                 trial_selection=trial_selection,
-            ),
+                subject=subject,
+                imagery_window=IMAGERY_WINDOW,
+                trial_counts=trial_counts,
+            )
         )
 
         save_figure(
@@ -312,6 +405,14 @@ def plot_shap_for_subject(
         )
 
         save_figure(
+            frequency_figure,
+            get_shap_frequency_relevance_path(
+                subject=subject,
+                trial_selection=trial_selection,
+            ),
+        )
+
+        save_figure(
             topographies_figure,
             get_shap_topographies_path(
                 subject=subject,
@@ -320,17 +421,21 @@ def plot_shap_for_subject(
         )
 
         plt.close(
-            channel_time_figure
-        )
-        plt.close(
             channel_relevance_figure
         )
+
         plt.close(
             channel_rankings_figure
         )
+
         plt.close(
             temporal_figure
         )
+
+        plt.close(
+            frequency_figure
+        )
+
         plt.close(
             topographies_figure
         )
@@ -339,18 +444,20 @@ def plot_shap_for_subject(
             trial_selection
         ] = (
             class_relevance,
+            frequency_relevance,
             trial_counts,
         )
 
         print(
             f"A{subject:02d} "
             f"({trial_selection}): "
-            f"SHAP trials={sum(trial_counts.values())}"
+            f"SHAP trials="
+            f"{sum(trial_counts.values())}"
         )
 
     accuracy = np.mean(
-        shap_result.predictions
-        == shap_result.labels
+        time_result.predictions
+        == time_result.labels
     )
 
     print(
@@ -364,7 +471,11 @@ def plot_shap_for_subject(
 def plot_mean_shap(
     aggregated_class_relevance: dict[
         TrialSelection,
-        list[ChannelTimeRelevance],
+        list[ClassRelevance],
+    ],
+    aggregated_frequency_relevance: dict[
+        TrialSelection,
+        list[VectorRelevance],
     ],
     aggregated_trial_counts: dict[
         TrialSelection,
@@ -373,6 +484,10 @@ def plot_mean_shap(
     reference_info,
     reference_times: np.ndarray,
     channel_names: list[str],
+    frequency_bands: tuple[
+        tuple[float, float],
+        ...,
+    ],
 ) -> None:
     """
     Compute and save global mean SHAP plots across subjects.
@@ -380,6 +495,12 @@ def plot_mean_shap(
     for trial_selection in TRIAL_SELECTIONS:
         class_relevance_list = (
             aggregated_class_relevance[
+                trial_selection
+            ]
+        )
+
+        frequency_relevance_list = (
+            aggregated_frequency_relevance[
                 trial_selection
             ]
         )
@@ -397,10 +518,18 @@ def plot_mean_shap(
             )
         )
 
-        mean_trial_counts = _sum_trial_counts(
-            aggregated_trial_counts[
-                trial_selection
-            ]
+        mean_frequency_relevance = (
+            _mean_class_relevance(
+                frequency_relevance_list
+            )
+        )
+
+        mean_trial_counts = (
+            _sum_trial_counts(
+                aggregated_trial_counts[
+                    trial_selection
+                ]
+            )
         )
 
         channel_relevance = (
@@ -428,24 +557,14 @@ def plot_mean_shap(
             )
         )
 
-        channel_time_figure = (
-            plot_channel_time_relevance(
-                class_relevance=mean_class_relevance,
-                times=reference_times,
-                channel_names=channel_names,
-                method="shap",
-                trial_selection=trial_selection,
-                subject=None,
-                imagery_window=IMAGERY_WINDOW,
-                trial_counts=mean_trial_counts,
-            )
-        )
+        # --------------------------------------------------------------
+        # Global mean plots
+        # --------------------------------------------------------------
 
         channel_relevance_figure = (
             plot_channel_relevance(
                 channel_relevance=channel_relevance,
                 channel_names=channel_names,
-                method="shap",
                 trial_selection=trial_selection,
                 subject=None,
                 trial_counts=mean_trial_counts,
@@ -455,7 +574,6 @@ def plot_mean_shap(
         channel_rankings_figure = (
             plot_channel_rankings(
                 channel_rankings=channel_rankings,
-                method="shap",
                 trial_selection=trial_selection,
                 subject=None,
                 top_n=10,
@@ -467,7 +585,6 @@ def plot_mean_shap(
             plot_temporal_relevance(
                 temporal_relevance=temporal_relevance,
                 times=reference_times,
-                method="shap",
                 trial_selection=trial_selection,
                 subject=None,
                 imagery_window=IMAGERY_WINDOW,
@@ -475,22 +592,29 @@ def plot_mean_shap(
             )
         )
 
-        topographies_figure = plot_topographies(
-            topographic_relevance=topographic_relevance,
-            info=reference_info,
-            method="shap",
-            trial_selection=trial_selection,
-            subject=None,
-            imagery_window=IMAGERY_WINDOW,
-            trial_counts=mean_trial_counts,
+        frequency_figure = (
+            plot_frequency_relevance(
+                frequency_relevance=(
+                    mean_frequency_relevance
+                ),
+                frequency_bands=frequency_bands,
+                trial_selection=trial_selection,
+                subject=None,
+                trial_counts=mean_trial_counts,
+            )
         )
 
-        save_figure(
-            channel_time_figure,
-            get_shap_channel_time_path(
-                subject=None,
+        topographies_figure = (
+            plot_topographies(
+                topographic_relevance=(
+                    topographic_relevance
+                ),
+                info=reference_info,
                 trial_selection=trial_selection,
-            ),
+                subject=None,
+                imagery_window=IMAGERY_WINDOW,
+                trial_counts=mean_trial_counts,
+            )
         )
 
         save_figure(
@@ -518,6 +642,14 @@ def plot_mean_shap(
         )
 
         save_figure(
+            frequency_figure,
+            get_shap_frequency_relevance_path(
+                subject=None,
+                trial_selection=trial_selection,
+            ),
+        )
+
+        save_figure(
             topographies_figure,
             get_shap_topographies_path(
                 subject=None,
@@ -526,17 +658,21 @@ def plot_mean_shap(
         )
 
         plt.close(
-            channel_time_figure
-        )
-        plt.close(
             channel_relevance_figure
         )
+
         plt.close(
             channel_rankings_figure
         )
+
         plt.close(
             temporal_figure
         )
+
+        plt.close(
+            frequency_figure
+        )
+
         plt.close(
             topographies_figure
         )
@@ -547,28 +683,104 @@ def plot_mean_shap(
         )
 
 
-def _mean_class_relevance(
-    relevance_list: list[ChannelTimeRelevance],
+def _get_trial_mask(
+    result,
+    trial_selection: TrialSelection,
+) -> np.ndarray:
+    """
+    Return the selected trial mask.
+    """
+    if trial_selection == "correct":
+        return result.correct_mask
+
+    return result.incorrect_mask
+
+
+def _compute_class_shap_relevance(
+    shap_values: np.ndarray,
+    labels: np.ndarray,
+    trial_mask: np.ndarray,
 ) -> dict[int, np.ndarray]:
     """
-    Compute the mean class-wise channel-time relevance across subjects.
-
-    If a class is missing for some subjects (for example in incorrect
-    trials), average only across subjects where that class is available.
+    Compute class-wise mean absolute SHAP relevance
+    for selected trials.
     """
-    mean_relevance: dict[int, np.ndarray] = {}
+    class_relevance = {}
+
+    for class_id in CLASS_LABELS:
+        class_mask = (
+            (labels == class_id)
+            & trial_mask
+        )
+
+        if not np.any(
+            class_mask
+        ):
+            continue
+
+        class_relevance[
+            class_id
+        ] = np.abs(
+            shap_values[
+                class_mask
+            ]
+        ).mean(
+            axis=0
+        )
+
+    return class_relevance
+
+
+def _count_trials_by_class(
+    labels: np.ndarray,
+    trial_mask: np.ndarray,
+) -> dict[int, int]:
+    """
+    Count selected trials for each motor-imagery class.
+    """
+    return {
+        class_id: int(
+            np.sum(
+                (labels == class_id)
+                & trial_mask
+            )
+        )
+        for class_id in CLASS_LABELS
+    }
+
+
+def _mean_class_relevance(
+    relevance_list: list[
+        Mapping[
+            int,
+            np.ndarray,
+        ]
+    ],
+) -> dict[int, np.ndarray]:
+    """
+    Compute class-wise mean relevance across subjects.
+
+    If a class is missing for some subjects, average only across
+    subjects where that class is available.
+    """
+    mean_relevance = {}
 
     for class_id in CLASS_LABELS:
         class_arrays = [
-            relevance[class_id]
-            for relevance in relevance_list
+            relevance[
+                class_id
+            ]
+            for relevance
+            in relevance_list
             if class_id in relevance
         ]
 
         if not class_arrays:
             continue
 
-        mean_relevance[class_id] = np.mean(
+        mean_relevance[
+            class_id
+        ] = np.mean(
             class_arrays,
             axis=0,
         )
@@ -577,29 +789,43 @@ def _mean_class_relevance(
 
 
 def _sum_trial_counts(
-    trial_counts_list: list[TrialCounts],
+    trial_counts_list: list[
+        TrialCounts
+    ],
 ) -> dict[int, int]:
     """
     Sum class-wise trial counts across subjects.
     """
-    summed_counts: dict[int, int] = {}
-
-    for class_id in CLASS_LABELS:
-        summed_counts[class_id] = int(
+    return {
+        class_id: int(
             sum(
-                counts.get(class_id, 0)
-                for counts in trial_counts_list
+                counts.get(
+                    class_id,
+                    0,
+                )
+                for counts
+                in trial_counts_list
             )
         )
-
-    return summed_counts
+        for class_id in CLASS_LABELS
+    }
 
 
 def main() -> None:
-    """Generate SHAP plots for all subjects and global means."""
+    """
+    Generate subject-wise and global mean EEGNet SHAP plots.
+    """
     aggregated_class_relevance: dict[
         TrialSelection,
-        list[ChannelTimeRelevance],
+        list[ClassRelevance],
+    ] = {
+        "correct": [],
+        "incorrect": [],
+    }
+
+    aggregated_frequency_relevance: dict[
+        TrialSelection,
+        list[VectorRelevance],
     ] = {
         "correct": [],
         "incorrect": [],
@@ -616,13 +842,16 @@ def main() -> None:
     reference_info = None
     reference_times = None
     reference_channel_names = None
+    reference_frequency_bands = None
 
     for subject in range(
         1,
         10,
     ):
-        subject_results = plot_shap_for_subject(
-            subject
+        subject_results = (
+            plot_shap_for_subject(
+                subject
+            )
         )
 
         if subject_results is None:
@@ -645,9 +874,11 @@ def main() -> None:
 
         if reference_info is None:
             reference_info = epochs.info
+
             reference_channel_names = (
                 epochs.ch_names
             )
+
             reference_times = (
                 np.arange(
                     X_eval.shape[-1]
@@ -656,35 +887,72 @@ def main() -> None:
                 + EPOCH_TMIN
             )
 
+            frequency_file = (
+                get_frequency_domain_shap_values_path(
+                    subject
+                )
+            )
+
+            frequency_result = (
+                load_frequency_domain_shap_result(
+                    frequency_file
+                )
+            )
+
+            reference_frequency_bands = (
+                frequency_result.frequency_bands
+            )
+
         for trial_selection, (
             class_relevance,
+            frequency_relevance,
             trial_counts,
         ) in subject_results.items():
             aggregated_class_relevance[
                 trial_selection
-            ].append(class_relevance)
+            ].append(
+                class_relevance
+            )
+
+            aggregated_frequency_relevance[
+                trial_selection
+            ].append(
+                frequency_relevance
+            )
 
             aggregated_trial_counts[
                 trial_selection
-            ].append(trial_counts)
+            ].append(
+                trial_counts
+            )
 
     if (
         reference_info is None
         or reference_times is None
         or reference_channel_names is None
+        or reference_frequency_bands is None
     ):
         print(
             "No subject data available for "
             "mean SHAP plots."
         )
+
         return
 
     plot_mean_shap(
-        aggregated_class_relevance=aggregated_class_relevance,
-        aggregated_trial_counts=aggregated_trial_counts,
+        aggregated_class_relevance=(
+            aggregated_class_relevance
+        ),
+        aggregated_frequency_relevance=(
+            aggregated_frequency_relevance
+        ),
+        aggregated_trial_counts=(
+            aggregated_trial_counts
+        ),
         reference_info=reference_info,
         reference_times=reference_times,
         channel_names=reference_channel_names,
+        frequency_bands=reference_frequency_bands,
     )
 
 

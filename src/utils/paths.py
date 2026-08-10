@@ -19,23 +19,21 @@ CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
-CSP_RESULTS_DIR = RESULTS_DIR / "csp_lda_occlusion_analysis"
-CSP_PATTERN_RESULTS_DIR = RESULTS_DIR / "csp_pattern_analysis"
 
-
-RelevanceMethod = Literal[
-    "shap",
-    "csp",
-]
 
 TrialSelection = Literal[
     "correct",
     "incorrect",
 ]
 
-RelevancePlotType = Literal[
-    "channel_time",
+SHAPDomain = Literal[
+    "time_domain",
+    "frequency_domain",
+]
+
+SHAPPlotType = Literal[
     "temporal_relevance",
+    "frequency_relevance",
     "topographies",
     "channel_rankings",
     "channel_relevance",
@@ -50,8 +48,6 @@ for directory in (
     CONFUSION_MATRIX_RESULTS_DIR,
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
-    CSP_RESULTS_DIR,
-    CSP_PATTERN_RESULTS_DIR,
 ):
     directory.mkdir(
         parents=True,
@@ -97,24 +93,7 @@ def _get_subject_spectral_subdir(
     )
 
 
-def _get_relevance_results_directory(
-    method: RelevanceMethod,
-) -> Path:
-    """
-    Return the main results directory for one relevance method.
-    """
-    if method == "shap":
-        return SHAP_RESULTS_DIR
-
-    if method == "csp":
-        return CSP_RESULTS_DIR
-
-    raise ValueError(
-        f"Unsupported relevance method: {method}"
-    )
-
-
-def _get_relevance_result_name(
+def _get_shap_result_name(
     subject: int | None,
 ) -> str:
     """
@@ -126,75 +105,50 @@ def _get_relevance_result_name(
     return get_subject_name(subject)
 
 
-def _get_relevance_plot_path(
-    method: RelevanceMethod,
-    plot_type: RelevancePlotType,
+def _get_shap_plot_path(
+    plot_type: SHAPPlotType,
     subject: int | None,
     trial_selection: TrialSelection,
 ) -> Path:
     """
-    Return a subject-wise or global mean relevance plot path.
+    Return a subject-wise or global mean SHAP plot path.
     """
-    base_directory = (
-        _get_relevance_results_directory(
-            method
-        )
-    )
-
     output_directory = _create_directory(
-        base_directory / plot_type
+        SHAP_RESULTS_DIR / plot_type
     )
 
-    result_name = _get_relevance_result_name(
+    result_name = _get_shap_result_name(
         subject
-    )
-
-    plot_filename_names = {
-        "channel_time": "channel_time",
-        "temporal_relevance": "temporal",
-        "topographies": "topographies",
-        "channel_rankings": "channel_rankings",
-        "channel_relevance": "channel_relevance",
-    }
-
-    plot_filename_name = (
-        plot_filename_names[plot_type]
     )
 
     filename = (
         f"{result_name}_"
-        f"{method}_"
-        f"{plot_filename_name}_"
+        f"shap_"
+        f"{plot_type}_"
         f"{trial_selection}.png"
     )
 
     return output_directory / filename
 
 
-def _get_relevance_values_path(
-    method: RelevanceMethod,
+def _get_shap_values_path(
     subject: int,
+    domain: SHAPDomain,
 ) -> Path:
     """
-    Return the saved relevance values path for one subject.
+    Return the saved SHAP values path for one subject and domain.
     """
     subject_name = get_subject_name(
         subject
     )
 
-    base_directory = (
-        _get_relevance_results_directory(
-            method
-        )
-    )
-
     output_directory = _create_directory(
-        base_directory / "values"
+        SHAP_RESULTS_DIR / "shap_values"
     )
 
     return (
         output_directory
-        / f"{subject_name}_{method}_values.npz"
+        / f"{subject_name}_{domain}.npz"
     )
 
 
@@ -498,30 +452,27 @@ def get_psd_path(
 # SHAP result paths
 # ----------------------------------------------------------------------
 
-def get_shap_values_path(
+def get_time_domain_shap_values_path(
     subject: int,
 ) -> Path:
     """
-    Return the saved SHAP values path for one subject.
+    Return the saved time-domain SHAP values path for one subject.
     """
-    return _get_relevance_values_path(
-        method="shap",
+    return _get_shap_values_path(
         subject=subject,
+        domain="time_domain",
     )
 
 
-def get_shap_channel_time_path(
-    subject: int | None,
-    trial_selection: TrialSelection,
+def get_frequency_domain_shap_values_path(
+    subject: int,
 ) -> Path:
     """
-    Return a subject-wise or global mean SHAP channel-time plot path.
+    Return the saved frequency-domain SHAP values path for one subject.
     """
-    return _get_relevance_plot_path(
-        method="shap",
-        plot_type="channel_time",
+    return _get_shap_values_path(
         subject=subject,
-        trial_selection=trial_selection,
+        domain="frequency_domain",
     )
 
 
@@ -530,11 +481,24 @@ def get_shap_temporal_relevance_path(
     trial_selection: TrialSelection,
 ) -> Path:
     """
-    Return a subject-wise or global mean SHAP temporal plot path.
+    Return a subject-wise or global mean SHAP temporal-relevance path.
     """
-    return _get_relevance_plot_path(
-        method="shap",
+    return _get_shap_plot_path(
         plot_type="temporal_relevance",
+        subject=subject,
+        trial_selection=trial_selection,
+    )
+
+
+def get_shap_frequency_relevance_path(
+    subject: int | None,
+    trial_selection: TrialSelection,
+) -> Path:
+    """
+    Return a subject-wise or global mean SHAP frequency-relevance path.
+    """
+    return _get_shap_plot_path(
+        plot_type="frequency_relevance",
         subject=subject,
         trial_selection=trial_selection,
     )
@@ -545,10 +509,9 @@ def get_shap_topographies_path(
     trial_selection: TrialSelection,
 ) -> Path:
     """
-    Return a subject-wise or global mean SHAP topography plot path.
+    Return a subject-wise or global mean SHAP topography path.
     """
-    return _get_relevance_plot_path(
-        method="shap",
+    return _get_shap_plot_path(
         plot_type="topographies",
         subject=subject,
         trial_selection=trial_selection,
@@ -560,10 +523,9 @@ def get_shap_channel_rankings_path(
     trial_selection: TrialSelection,
 ) -> Path:
     """
-    Return a subject-wise or global mean SHAP channel-ranking plot path.
+    Return a subject-wise or global mean SHAP channel-ranking path.
     """
-    return _get_relevance_plot_path(
-        method="shap",
+    return _get_shap_plot_path(
         plot_type="channel_rankings",
         subject=subject,
         trial_selection=trial_selection,
@@ -575,143 +537,10 @@ def get_shap_channel_relevance_path(
     trial_selection: TrialSelection,
 ) -> Path:
     """
-    Return a subject-wise or global mean SHAP channel-relevance plot path.
+    Return a subject-wise or global mean SHAP channel-relevance path.
     """
-    return _get_relevance_plot_path(
-        method="shap",
+    return _get_shap_plot_path(
         plot_type="channel_relevance",
         subject=subject,
         trial_selection=trial_selection,
-    )
-
-
-# ----------------------------------------------------------------------
-# CSP occlusion result paths
-# ----------------------------------------------------------------------
-
-def get_csp_values_path(
-    subject: int,
-) -> Path:
-    """
-    Return the saved CSP occlusion values path for one subject.
-    """
-    return _get_relevance_values_path(
-        method="csp",
-        subject=subject,
-    )
-
-
-def get_csp_channel_time_path(
-    subject: int | None,
-    trial_selection: TrialSelection,
-) -> Path:
-    """
-    Return a subject-wise or global mean CSP channel-time plot path.
-    """
-    return _get_relevance_plot_path(
-        method="csp",
-        plot_type="channel_time",
-        subject=subject,
-        trial_selection=trial_selection,
-    )
-
-
-def get_csp_temporal_relevance_path(
-    subject: int | None,
-    trial_selection: TrialSelection,
-) -> Path:
-    """
-    Return a subject-wise or global mean CSP temporal plot path.
-    """
-    return _get_relevance_plot_path(
-        method="csp",
-        plot_type="temporal_relevance",
-        subject=subject,
-        trial_selection=trial_selection,
-    )
-
-
-def get_csp_topographies_path(
-    subject: int | None,
-    trial_selection: TrialSelection,
-) -> Path:
-    """
-    Return a subject-wise or global mean CSP topography plot path.
-    """
-    return _get_relevance_plot_path(
-        method="csp",
-        plot_type="topographies",
-        subject=subject,
-        trial_selection=trial_selection,
-    )
-
-
-def get_csp_channel_rankings_path(
-    subject: int | None,
-    trial_selection: TrialSelection,
-) -> Path:
-    """
-    Return a subject-wise or global mean CSP channel-ranking plot path.
-    """
-    return _get_relevance_plot_path(
-        method="csp",
-        plot_type="channel_rankings",
-        subject=subject,
-        trial_selection=trial_selection,
-    )
-
-
-def get_csp_channel_relevance_path(
-    subject: int | None,
-    trial_selection: TrialSelection,
-) -> Path:
-    """
-    Return a subject-wise or global mean CSP channel-relevance plot path.
-    """
-    return _get_relevance_plot_path(
-        method="csp",
-        plot_type="channel_relevance",
-        subject=subject,
-        trial_selection=trial_selection,
-    )
-
-
-def get_csp_pattern_values_path(
-    subject: int,
-) -> Path:
-    """
-    Return the saved CSP spatial-pattern values path.
-    """
-    subject_name = get_subject_name(
-        subject
-    )
-
-    output_dir = _create_directory(
-        CSP_PATTERN_RESULTS_DIR / "values"
-    )
-
-    return (
-        output_dir
-        / f"{subject_name}_csp_patterns.npz"
-    )
-
-
-def get_csp_subject_patterns_path(
-    subject: int,
-) -> Path:
-    """
-    Return the CSP spatial-pattern figure path for one subject.
-    """
-    subject_name = get_subject_name(
-        subject
-    )
-
-    output_dir = _create_directory(
-        CSP_PATTERN_RESULTS_DIR
-        / "subject_patterns"
-    )
-
-    return (
-        output_dir
-        / f"{subject_name}_csp_patterns.png"
     )

@@ -4,7 +4,7 @@ import numpy as np
 def compute_topographic_shap_relevance(
     class_relevance: dict[int, np.ndarray],
     times: np.ndarray,
-    imagery_window: tuple[float, float] = (0.5, 3.5),
+    imagery_window: tuple[float, float] = (0.5, 4.0),
 ) -> dict[int, np.ndarray]:
     """
     Average class-wise SHAP relevance across an imagery interval.

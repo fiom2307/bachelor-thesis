@@ -1,5 +1,4 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Literal
 
 import matplotlib.pyplot as plt
@@ -13,19 +12,9 @@ from src.data.labels import (
 )
 
 
-RelevanceMethod = Literal[
-    "shap",
-    "csp",
-]
-
 TrialSelection = Literal[
     "correct",
     "incorrect",
-]
-
-ChannelTimeRelevance = Mapping[
-    int,
-    np.ndarray,
 ]
 
 VectorRelevance = Mapping[
@@ -43,231 +32,20 @@ ChannelRankings = Mapping[
     list[tuple[str, float]],
 ]
 
-
-@dataclass(frozen=True)
-class RelevancePlotConfig:
-    """
-    Plot labels for one relevance-analysis method.
-    """
-
-    channel_time_title: str
-    temporal_title: str
-    topographies_title: str
-    channel_relevance_title: str
-    ranking_method_name: str
-    relevance_label: str
-    time_label: str
-
-
-PLOT_CONFIGS = {
-    "shap": RelevancePlotConfig(
-        channel_time_title=(
-            "EEGNet channel–time SHAP relevance"
-        ),
-        temporal_title=(
-            "EEGNet temporal SHAP relevance"
-        ),
-        topographies_title=(
-            "EEGNet SHAP topographies"
-        ),
-        channel_relevance_title=(
-            "Class-wise EEG channel SHAP relevance"
-        ),
-        ranking_method_name=(
-            "SHAP relevance"
-        ),
-        relevance_label=(
-            "Mean absolute SHAP value"
-        ),
-        time_label=(
-            "Time relative to cue (s)"
-        ),
-    ),
-    "csp": RelevancePlotConfig(
-        channel_time_title=(
-            "CSP+LDA channel–time occlusion relevance"
-        ),
-        temporal_title=(
-            "CSP+LDA temporal occlusion relevance"
-        ),
-        topographies_title=(
-            "CSP+LDA occlusion topographies"
-        ),
-        channel_relevance_title=(
-            "Class-wise CSP+LDA channel relevance"
-        ),
-        ranking_method_name=(
-            "CSP+LDA occlusion relevance"
-        ),
-        relevance_label=(
-            "Mean absolute probability change"
-        ),
-        time_label=(
-            "Occlusion-window center time (s)"
-        ),
-    ),
-}
-
-
-def plot_channel_time_relevance(
-    class_relevance: ChannelTimeRelevance,
-    times: np.ndarray,
-    channel_names: list[str],
-    method: RelevanceMethod,
-    trial_selection: TrialSelection,
-    subject: int | None,
-    imagery_window: tuple[float, float] = (0.5, 4.0),
-    trial_counts: TrialCounts | None = None,
-) -> Figure:
-    """
-    Plot class-wise relevance across EEG channels and time.
-    """
-    config = _get_plot_config(
-        method
-    )
-
-    class_ids = _get_class_ids(
-        class_relevance
-    )
-
-    _validate_class_relevance(
-        class_ids
-    )
-
-    figure, axes = plt.subplots(
-        nrows=2,
-        ncols=2,
-        figsize=(15, 10),
-        constrained_layout=True,
-    )
-
-    axes = axes.ravel()
-
-    maximum_relevance = max(
-        np.max(
-            class_relevance[
-                class_id
-            ]
-        )
-        for class_id in class_ids
-    )
-
-    maximum_relevance = max(
-        float(maximum_relevance),
-        np.finfo(float).eps,
-    )
-
-    image = None
-
-    for axis, class_id in zip(
-        axes,
-        class_ids,
-        strict=False,
-    ):
-        relevance = class_relevance[
-            class_id
-        ]
-
-        if relevance.shape != (
-            len(channel_names),
-            len(times),
-        ):
-            raise ValueError(
-                "Each channel-time relevance matrix must "
-                "have shape (channels, times)."
-            )
-
-        image = axis.imshow(
-            relevance,
-            aspect="auto",
-            origin="upper",
-            interpolation="nearest",
-            extent=(
-                times[0],
-                times[-1],
-                len(channel_names) - 0.5,
-                -0.5,
-            ),
-            cmap="viridis",
-            vmin=0.0,
-            vmax=maximum_relevance,
-        )
-
-        axis.set_title(
-            _get_class_title(
-                class_id,
-                trial_counts,
-            )
-        )
-
-        axis.set_xlabel(
-            config.time_label
-        )
-
-        axis.set_ylabel(
-            "EEG channel"
-        )
-
-        axis.set_yticks(
-            np.arange(
-                len(channel_names)
-            )
-        )
-
-        axis.set_yticklabels(
-            channel_names,
-            fontsize=8,
-        )
-
-        _mark_imagery_window(
-            axis,
-            imagery_window,
-        )
-
-    for axis in axes[
-        len(class_ids):
-    ]:
-        axis.set_visible(False)
-
-    if image is not None:
-        colorbar = figure.colorbar(
-            image,
-            ax=axes.tolist(),
-            shrink=0.85,
-        )
-
-        colorbar.set_label(
-            config.relevance_label
-        )
-
-    figure.suptitle(
-        _build_title(
-            base_title=config.channel_time_title,
-            trial_selection=trial_selection,
-            subject=subject,
-        ),
-        fontsize=15,
-    )
-
-    return figure
+FrequencyBand = tuple[float, float]
 
 
 def plot_temporal_relevance(
     temporal_relevance: VectorRelevance,
     times: np.ndarray,
-    method: RelevanceMethod,
     trial_selection: TrialSelection,
     subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
     """
-    Plot temporal relevance averaged across EEG channels.
+    Plot temporal SHAP relevance averaged across EEG channels.
     """
-    config = _get_plot_config(
-        method
-    )
-
     class_ids = _get_class_ids(
         temporal_relevance
     )
@@ -309,18 +87,18 @@ def plot_temporal_relevance(
 
     axis.set_title(
         _build_title(
-            base_title=config.temporal_title,
+            base_title="EEGNet temporal SHAP relevance",
             trial_selection=trial_selection,
             subject=subject,
         )
     )
 
     axis.set_xlabel(
-        config.time_label
+        "Time relative to cue (s)"
     )
 
     axis.set_ylabel(
-        config.relevance_label
+        "Mean absolute SHAP value"
     )
 
     axis.set_xlim(
@@ -339,10 +117,105 @@ def plot_temporal_relevance(
     return figure
 
 
+def plot_frequency_relevance(
+    frequency_relevance: VectorRelevance,
+    frequency_bands: tuple[
+        FrequencyBand,
+        ...,
+    ],
+    trial_selection: TrialSelection,
+    subject: int | None,
+    trial_counts: TrialCounts | None = None,
+) -> Figure:
+    """
+    Plot class-wise SHAP relevance across frequency bands.
+    """
+    class_ids = _get_class_ids(
+        frequency_relevance
+    )
+
+    _validate_class_relevance(
+        class_ids
+    )
+
+    band_labels = [
+        f"{low:g}–{high:g}"
+        for low, high in frequency_bands
+    ]
+
+    band_positions = np.arange(
+        len(frequency_bands)
+    )
+
+    figure, axis = plt.subplots(
+        figsize=(11, 6),
+        constrained_layout=True,
+    )
+
+    for class_id in class_ids:
+        relevance = frequency_relevance[
+            class_id
+        ]
+
+        if len(relevance) != len(
+            frequency_bands
+        ):
+            raise ValueError(
+                "The number of frequency relevance values "
+                "must match the number of frequency bands."
+            )
+
+        axis.plot(
+            band_positions,
+            relevance,
+            marker="o",
+            linewidth=2,
+            label=_get_class_title(
+                class_id,
+                trial_counts,
+            ),
+        )
+
+    axis.set_title(
+        _build_title(
+            base_title="EEGNet frequency-domain SHAP relevance",
+            trial_selection=trial_selection,
+            subject=subject,
+        )
+    )
+
+    axis.set_xlabel(
+        "Frequency band (Hz)"
+    )
+
+    axis.set_ylabel(
+        "Mean absolute SHAP value"
+    )
+
+    axis.set_xticks(
+        band_positions
+    )
+
+    axis.set_xticklabels(
+        band_labels,
+        rotation=45,
+        ha="right",
+    )
+
+    axis.grid(
+        alpha=0.25,
+    )
+
+    axis.legend(
+        title="Motor-imagery class",
+    )
+
+    return figure
+
+
 def plot_topographies(
     topographic_relevance: VectorRelevance,
     info: mne.Info,
-    method: RelevanceMethod,
     trial_selection: TrialSelection,
     subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
@@ -350,12 +223,8 @@ def plot_topographies(
     show_channel_names: bool = False,
 ) -> Figure:
     """
-    Plot class-wise scalp topographies of model relevance.
+    Plot class-wise scalp topographies of SHAP relevance.
     """
-    config = _get_plot_config(
-        method
-    )
-
     class_ids = _get_class_ids(
         topographic_relevance
     )
@@ -447,7 +316,7 @@ def plot_topographies(
         )
 
         colorbar.set_label(
-            config.relevance_label
+            "Mean absolute SHAP value"
         )
 
     window_start, window_end = (
@@ -457,7 +326,7 @@ def plot_topographies(
     figure.suptitle(
         _build_title(
             base_title=(
-                f"{config.topographies_title} "
+                "EEGNet SHAP topographies "
                 f"({window_start:.1f}–{window_end:.1f} s)"
             ),
             trial_selection=trial_selection,
@@ -472,18 +341,13 @@ def plot_topographies(
 def plot_channel_relevance(
     channel_relevance: VectorRelevance,
     channel_names: list[str],
-    method: RelevanceMethod,
     trial_selection: TrialSelection,
     subject: int | None,
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
     """
-    Plot a class-by-channel relevance heatmap.
+    Plot a class-by-channel SHAP relevance heatmap.
     """
-    config = _get_plot_config(
-        method
-    )
-
     class_ids = _get_class_ids(
         channel_relevance
     )
@@ -558,7 +422,9 @@ def plot_channel_relevance(
 
     axis.set_title(
         _build_title(
-            base_title=config.channel_relevance_title,
+            base_title=(
+                "Class-wise EEG channel SHAP relevance"
+            ),
             trial_selection=trial_selection,
             subject=subject,
         )
@@ -579,7 +445,7 @@ def plot_channel_relevance(
     )
 
     colorbar.set_label(
-        config.relevance_label
+        "Mean absolute SHAP value"
     )
 
     return figure
@@ -587,19 +453,14 @@ def plot_channel_relevance(
 
 def plot_channel_rankings(
     channel_rankings: ChannelRankings,
-    method: RelevanceMethod,
     trial_selection: TrialSelection,
     subject: int | None,
     top_n: int = 10,
     trial_counts: TrialCounts | None = None,
 ) -> Figure:
     """
-    Plot the highest-ranked EEG channels for each class.
+    Plot the highest-ranked EEG channels by SHAP relevance.
     """
-    config = _get_plot_config(
-        method
-    )
-
     if top_n <= 0:
         raise ValueError(
             "top_n must be greater than zero."
@@ -660,7 +521,7 @@ def plot_channel_rankings(
         )
 
         axis.set_xlabel(
-            config.relevance_label
+            "Mean absolute SHAP value"
         )
 
         axis.set_ylabel(
@@ -680,8 +541,7 @@ def plot_channel_rankings(
     figure.suptitle(
         _build_title(
             base_title=(
-                f"Top {top_n} EEG channels by "
-                f"{config.ranking_method_name}"
+                f"Top {top_n} EEG channels by SHAP relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,
@@ -690,22 +550,6 @@ def plot_channel_rankings(
     )
 
     return figure
-
-
-def _get_plot_config(
-    method: RelevanceMethod,
-) -> RelevancePlotConfig:
-    """
-    Return the plot configuration for one analysis method.
-    """
-    try:
-        return PLOT_CONFIGS[
-            method
-        ]
-    except KeyError as error:
-        raise ValueError(
-            f"Unsupported relevance method: {method}"
-        ) from error
 
 
 def _get_class_ids(
@@ -821,7 +665,9 @@ def _get_result_scope_label(
     if subject is None:
         return "mean across subjects"
 
-    return f"{_get_subject_name(subject)}"
+    return _get_subject_name(
+        subject
+    )
 
 
 def _build_title(
@@ -830,8 +676,7 @@ def _build_title(
     subject: int | None,
 ) -> str:
     """
-    Build a title including method-specific title, trial subset,
-    and subject/global scope.
+    Build a title including trial subset and subject/global scope.
     """
     trial_label = _get_trial_selection_label(
         trial_selection

@@ -56,22 +56,10 @@ Generate the ERD/ERS topographies, time-frequency representations, and power spe
 python -m scripts.plot_spectral_analysis
 ```
 
-Generate the CSP+LDA occlusion relevance plots:
-
-```powershell
-python -m scripts.plot_csp_lda_occlusion_analysis
-```
-
 Compute and generate the EEGNet SHAP relevance plots:
 
 ```powershell
 python -m scripts.plot_shap_analysis
-```
-
-Compare the channel-wise and temporal relevance obtained for EEGNet and CSP+LDA:
-
-```powershell
-python -m scripts.compare_relevance
 ```
 
 Deactivate the virtual environment after finishing:

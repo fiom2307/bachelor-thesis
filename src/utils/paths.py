@@ -19,6 +19,7 @@ CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
 SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
+CSP_PATTERN_ANALYSIS_DIR = RESULTS_DIR / "csp_pattern_analysis"
 
 
 TrialSelection = Literal[
@@ -39,6 +40,11 @@ SHAPPlotType = Literal[
     "channel_relevance",
 ]
 
+CSPPatternPlotType = Literal[
+    "channel_rankings",
+    "channel_relevance",
+]
+
 
 # Create main output directories
 for directory in (
@@ -48,6 +54,7 @@ for directory in (
     CONFUSION_MATRIX_RESULTS_DIR,
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
+    CSP_PATTERN_ANALYSIS_DIR,
 ):
     directory.mkdir(
         parents=True,
@@ -150,6 +157,43 @@ def _get_shap_values_path(
         output_directory
         / f"{subject_name}_{domain}.npz"
     )
+
+
+def _get_csp_pattern_result_name(
+    subject: int | None,
+) -> str:
+    """
+    Return the filename prefix for a subject-wise
+    or global mean CSP pattern result.
+    """
+    if subject is None:
+        return "all_mean"
+
+    return get_subject_name(subject)
+
+
+def _get_csp_pattern_plot_path(
+    plot_type: CSPPatternPlotType,
+    subject: int | None,
+) -> Path:
+    """
+    Return a subject-wise or global mean CSP pattern plot path.
+    """
+    output_directory = _create_directory(
+        CSP_PATTERN_ANALYSIS_DIR / plot_type
+    )
+
+    result_name = _get_csp_pattern_result_name(
+        subject
+    )
+
+    filename = (
+        f"{result_name}_"
+        f"csp_"
+        f"{plot_type}.png"
+    )
+
+    return output_directory / filename
 
 
 def get_subject_name(
@@ -543,4 +587,34 @@ def get_shap_channel_relevance_path(
         plot_type="channel_relevance",
         subject=subject,
         trial_selection=trial_selection,
+    )
+
+
+# ----------------------------------------------------------------------
+# CSP pattern analysis paths
+# ----------------------------------------------------------------------
+
+def get_csp_channel_relevance_path(
+    subject: int | None,
+) -> Path:
+    """
+    Return a subject-wise or global mean
+    CSP channel-relevance path.
+    """
+    return _get_csp_pattern_plot_path(
+        plot_type="channel_relevance",
+        subject=subject,
+    )
+
+
+def get_csp_channel_rankings_path(
+    subject: int | None,
+) -> Path:
+    """
+    Return a subject-wise or global mean
+    CSP channel-ranking path.
+    """
+    return _get_csp_pattern_plot_path(
+        plot_type="channel_rankings",
+        subject=subject,
     )

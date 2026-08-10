@@ -43,6 +43,9 @@ SHAPPlotType = Literal[
 CSPPatternPlotType = Literal[
     "channel_rankings",
     "channel_relevance",
+    "topographies",
+    "temporal_relevance",
+    "frequency_relevance",
 ]
 
 
@@ -616,5 +619,44 @@ def get_csp_channel_rankings_path(
     """
     return _get_csp_pattern_plot_path(
         plot_type="channel_rankings",
+        subject=subject,
+    )
+
+
+def get_csp_temporal_relevance_path(
+    subject: int | None,
+) -> Path:
+    """
+    Return a subject-wise or global mean
+    CSP temporal-relevance path.
+    """
+    return _get_csp_pattern_plot_path(
+        plot_type="temporal_relevance",
+        subject=subject,
+    )
+
+
+def get_csp_frequency_relevance_path(
+    subject: int | None,
+) -> Path:
+    """
+    Return a subject-wise or global mean
+    CSP frequency-relevance path.
+    """
+    return _get_csp_pattern_plot_path(
+        plot_type="frequency_relevance",
+        subject=subject,
+    )
+
+
+def get_csp_topographies_path(
+    subject: int | None,
+) -> Path:
+    """
+    Return a subject-wise or global mean
+    CSP topographies path.
+    """
+    return _get_csp_pattern_plot_path(
+        plot_type="topographies",
         subject=subject,
     )

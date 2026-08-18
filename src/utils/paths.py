@@ -13,6 +13,7 @@ RESULTS_DIR = ROOT_DIR / "results"
 
 EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
+CSP_SVM_MODEL_DIR = MODEL_DIR / "csp_svm"
 
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
 CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
@@ -53,6 +54,7 @@ CSPPatternPlotType = Literal[
 for directory in (
     EEGNET_MODEL_DIR,
     CSP_LDA_MODEL_DIR,
+    CSP_SVM_MODEL_DIR,
     ACCURACY_RESULTS_DIR,
     CONFUSION_MATRIX_RESULTS_DIR,
     SPECTRAL_ANALYSIS_DIR,
@@ -279,6 +281,19 @@ def get_csp_lda_subject_dir(
     )
 
 
+def get_csp_svm_subject_dir(
+    subject: int,
+) -> Path:
+    """
+    Return and create the CSP+SVM model directory for one subject.
+    """
+    return _create_directory(
+        CSP_SVM_MODEL_DIR
+        / f"seed_{BASE_SEED}"
+        / get_subject_name(subject)
+    )
+
+
 def get_csp_fold_model_path(
     subject: int,
     fold: int,
@@ -319,6 +334,28 @@ def get_lda_fold_model_path(
 
     return (
         get_csp_lda_subject_dir(subject)
+        / filename
+    )
+
+
+def get_svm_fold_model_path(
+    subject: int,
+    fold: int,
+) -> Path:
+    """
+    Return the SVM model path for one cross-validation fold.
+    """
+    subject_name = get_subject_name(
+        subject
+    )
+
+    filename = (
+        f"{subject_name}_svm_kfold_"
+        f"seed{BASE_SEED}_fold{fold}.joblib"
+    )
+
+    return (
+        get_csp_svm_subject_dir(subject)
         / filename
     )
 
@@ -375,6 +412,19 @@ def get_results_accuracy_comparison_path() -> Path:
         / (
             f"seed_{BASE_SEED}_"
             "csp_lda_vs_eegnet.csv"
+        )
+    )
+
+
+def get_results_accuracy_comparison_path_with_svm() -> Path:
+    """
+    Return the CSP+SVM and EEGNet accuracy comparison CSV path.
+    """
+    return (
+        ACCURACY_RESULTS_DIR
+        / (
+            f"seed_{BASE_SEED}_"
+            "csp_svm_vs_eegnet.csv"
         )
     )
 

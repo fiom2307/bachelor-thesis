@@ -233,11 +233,60 @@ def _create_times(
     )
 
 
+def _compute_shared_spatial_vmax(
+    *relevance_arrays: np.ndarray,
+) -> float:
+    """
+    Compute one shared maximum across several
+    channel-relevance arrays.
+
+    NaN values are ignored because a class can contain
+    no selected trials for a particular subject.
+    """
+    finite_values = [
+        np.asarray(
+            relevance,
+            dtype=np.float64,
+        )[
+            np.isfinite(
+                relevance
+            )
+        ]
+        for relevance in relevance_arrays
+    ]
+
+    finite_values = [
+        values
+        for values in finite_values
+        if values.size > 0
+    ]
+
+    if not finite_values:
+        return float(
+            np.finfo(float).eps
+        )
+
+    maximum = np.max(
+        np.concatenate(
+            finite_values
+        )
+    )
+
+    return max(
+        float(maximum),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+
 def _plot_spatial_relevance(
     channel_relevance: np.ndarray,
+    class_counts: np.ndarray,
     subject_name: str,
     selection: str,
     subject: int | None,
+    vmax: float,
 ) -> None:
     """
     Plot channel relevance, channel rankings, and
@@ -257,6 +306,19 @@ def _plot_spatial_relevance(
             f"with shape {expected_shape}, "
             f"but received "
             f"{channel_relevance.shape}."
+        )
+
+    class_counts = np.asarray(
+        class_counts,
+        dtype=int,
+    )
+
+    if class_counts.shape != (
+        len(CLASS_NAMES),
+    ):
+        raise ValueError(
+            "Expected one trial count for each "
+            "motor-imagery class."
         )
 
     plot_subject = (
@@ -323,6 +385,9 @@ def _plot_spatial_relevance(
             topographies_path.parent
         ),
         sfreq=SFREQ,
+        class_counts=class_counts,
+        vmin=0.0,
+        vmax=vmax,
     )
 
 
@@ -426,9 +491,14 @@ def plot_subject_analysis(
     np.ndarray,
     np.ndarray,
     np.ndarray,
+    np.ndarray,
+    np.ndarray,
 ]:
     """
     Compute and plot CSP+LDA relevance for one subject.
+
+    Correct and incorrect spatial topographies use
+    the same color scale.
     """
     subject_name = get_subject_name(
         subject
@@ -501,6 +571,22 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
+    # SHARED SPATIAL COLOR SCALE
+    # ==========================================================
+
+    spatial_vmax = (
+        _compute_shared_spatial_vmax(
+            correct_channel_relevance,
+            incorrect_channel_relevance,
+        )
+    )
+
+    print(
+        f"{subject_name} shared spatial vmax: "
+        f"{spatial_vmax:.6f}"
+    )
+
+    # ==========================================================
     # CORRECT SPATIAL RELEVANCE
     # ==========================================================
 
@@ -508,9 +594,11 @@ def plot_subject_analysis(
         channel_relevance=(
             correct_channel_relevance
         ),
+        class_counts=correct_counts,
         subject_name=subject_name,
         selection="correct",
         subject=subject,
+        vmax=spatial_vmax,
     )
 
     # ==========================================================
@@ -521,9 +609,11 @@ def plot_subject_analysis(
         channel_relevance=(
             incorrect_channel_relevance
         ),
+        class_counts=incorrect_counts,
         subject_name=subject_name,
         selection="incorrect",
         subject=subject,
+        vmax=spatial_vmax,
     )
 
     # ==========================================================
@@ -699,6 +789,8 @@ def plot_subject_analysis(
         correct_frequency_relevance,
         incorrect_frequency_relevance,
         frequencies,
+        correct_counts,
+        incorrect_counts,
     )
 
 
@@ -724,13 +816,22 @@ def plot_global_analysis(
     subject_frequencies: list[
         np.ndarray
     ],
+    subject_correct_counts: list[
+        np.ndarray
+    ],
+    subject_incorrect_counts: list[
+        np.ndarray
+    ],
 ) -> None:
     """
     Plot mean CSP+LDA relevance across all subjects.
+
+    Global correct and incorrect spatial topographies
+    use exactly the same color scale.
     """
 
     # ==========================================================
-    # GLOBAL CORRECT SPATIAL RELEVANCE
+    # GLOBAL SPATIAL RELEVANCE
     # ==========================================================
 
     mean_correct_channel_relevance = np.nanmean(
@@ -741,19 +842,6 @@ def plot_global_analysis(
         axis=0,
     )
 
-    _plot_spatial_relevance(
-        channel_relevance=(
-            mean_correct_channel_relevance
-        ),
-        subject_name="all_mean",
-        selection="correct",
-        subject=None,
-    )
-
-    # ==========================================================
-    # GLOBAL INCORRECT SPATIAL RELEVANCE
-    # ==========================================================
-
     mean_incorrect_channel_relevance = np.nanmean(
         np.stack(
             subject_incorrect_channel_relevances,
@@ -762,13 +850,67 @@ def plot_global_analysis(
         axis=0,
     )
 
+    # Total number of selected trials across subjects.
+    total_correct_counts = np.sum(
+        np.stack(
+            subject_correct_counts,
+            axis=0,
+        ),
+        axis=0,
+    ).astype(
+        int
+    )
+
+    total_incorrect_counts = np.sum(
+        np.stack(
+            subject_incorrect_counts,
+            axis=0,
+        ),
+        axis=0,
+    ).astype(
+        int
+    )
+
+    global_spatial_vmax = (
+        _compute_shared_spatial_vmax(
+            mean_correct_channel_relevance,
+            mean_incorrect_channel_relevance,
+        )
+    )
+
+    print(
+        "Global correct/incorrect shared spatial "
+        f"vmax: {global_spatial_vmax:.6f}"
+    )
+
+    # ==========================================================
+    # GLOBAL CORRECT SPATIAL RELEVANCE
+    # ==========================================================
+
+    _plot_spatial_relevance(
+        channel_relevance=(
+            mean_correct_channel_relevance
+        ),
+        class_counts=total_correct_counts,
+        subject_name="all_mean",
+        selection="correct",
+        subject=None,
+        vmax=global_spatial_vmax,
+    )
+
+    # ==========================================================
+    # GLOBAL INCORRECT SPATIAL RELEVANCE
+    # ==========================================================
+
     _plot_spatial_relevance(
         channel_relevance=(
             mean_incorrect_channel_relevance
         ),
+        class_counts=total_incorrect_counts,
         subject_name="all_mean",
         selection="incorrect",
         subject=None,
+        vmax=global_spatial_vmax,
     )
 
     # ==========================================================
@@ -951,6 +1093,9 @@ def main() -> None:
     subject_correct_frequency_relevances = []
     subject_incorrect_frequency_relevances = []
 
+    subject_correct_counts = []
+    subject_incorrect_counts = []
+
     subject_frequencies = []
 
     for subject in SUBJECTS:
@@ -962,6 +1107,8 @@ def main() -> None:
             correct_frequency_relevance,
             incorrect_frequency_relevance,
             frequencies,
+            correct_counts,
+            incorrect_counts,
         ) = plot_subject_analysis(
             subject
         )
@@ -988,6 +1135,14 @@ def main() -> None:
 
         subject_incorrect_frequency_relevances.append(
             incorrect_frequency_relevance
+        )
+
+        subject_correct_counts.append(
+            correct_counts
+        )
+
+        subject_incorrect_counts.append(
+            incorrect_counts
         )
 
         subject_frequencies.append(
@@ -1019,6 +1174,12 @@ def main() -> None:
         ),
         subject_frequencies=(
             subject_frequencies
+        ),
+        subject_correct_counts=(
+            subject_correct_counts
+        ),
+        subject_incorrect_counts=(
+            subject_incorrect_counts
         ),
     )
 

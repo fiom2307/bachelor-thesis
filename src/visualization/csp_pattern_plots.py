@@ -430,11 +430,17 @@ def plot_csp_topographies(
     channel_names: list[str],
     class_names: list[str],
     subject: str,
-    output_dir: Path,
-    sfreq: float = 250.0,
+    output_dir,
+    sfreq: float,
+    class_counts: np.ndarray | None = None,
+    vmin: float = 0.0,
+    vmax: float | None = None,
 ) -> None:
     """
     Plot class-wise CSP+LDA channel-relevance topographies.
+
+    A shared vmin/vmax can be supplied so correct and incorrect
+    trial selections use the same color scale.
     """
     channel_relevance = np.asarray(
         channel_relevance,
@@ -451,6 +457,20 @@ def plot_csp_topographies(
             "channel_relevance must have shape "
             f"{expected_shape}."
         )
+
+    if class_counts is not None:
+        class_counts = np.asarray(
+            class_counts,
+            dtype=int,
+        )
+
+        if class_counts.shape != (
+            len(class_names),
+        ):
+            raise ValueError(
+                "class_counts must contain one "
+                "value per class."
+            )
 
     output_dir.mkdir(
         parents=True,
@@ -478,13 +498,24 @@ def plot_csp_topographies(
     )
 
     # ----------------------------------------------------------
-    # Shared scale across all four classes
+    # Color scale
+    #
+    # If vmax is supplied by the analysis script, use it.
+    # Otherwise fall back to the maximum of this plot.
     # ----------------------------------------------------------
 
-    vmin = 0.0
+    if vmax is None:
+        vmax = float(
+            np.nanmax(
+                channel_relevance
+            )
+        )
 
-    vmax = float(
-        np.max(channel_relevance)
+    vmax = max(
+        float(vmax),
+        float(
+            np.finfo(float).eps
+        ),
     )
 
     # ----------------------------------------------------------
@@ -504,19 +535,40 @@ def plot_csp_topographies(
     ):
         ax = axes[class_idx]
 
+        relevance = (
+            channel_relevance[
+                class_idx
+            ]
+        )
+
         mne.viz.plot_topomap(
-            channel_relevance[class_idx],
+            relevance,
             info,
             axes=ax,
             show=False,
             contours=0,
             cmap="viridis",
-            vlim=(vmin, vmax),
+            vlim=(
+                vmin,
+                vmax,
+            ),
             sensors=True,
         )
 
+        # ------------------------------------------------------
+        # Class title with trial count
+        # ------------------------------------------------------
+
+        if class_counts is not None:
+            class_title = (
+                f"{class_name} "
+                f"(n={class_counts[class_idx]})"
+            )
+        else:
+            class_title = class_name
+
         ax.set_title(
-            class_name,
+            class_title,
             fontsize=13,
             pad=10,
         )
@@ -526,7 +578,9 @@ def plot_csp_topographies(
     # ----------------------------------------------------------
 
     if subject == "all_mean":
-        title_suffix = "mean across subjects"
+        title_suffix = (
+            "mean across subjects"
+        )
     else:
         title_suffix = subject
 
@@ -596,4 +650,6 @@ def plot_csp_topographies(
         bbox_inches="tight",
     )
 
-    plt.close(fig)
+    plt.close(
+        fig
+    )

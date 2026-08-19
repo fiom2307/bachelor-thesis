@@ -100,6 +100,9 @@ def plot_shap_for_subject(
     """
     Compute and save EEGNet SHAP plots for one subject.
 
+    Correct and incorrect topographies use the same color scale
+    within each subject.
+
     Returns time-domain class relevance, frequency-domain relevance,
     and trial counts for each trial selection so they can later be
     aggregated into global mean plots.
@@ -245,6 +248,10 @@ def plot_shap_for_subject(
 
     # ------------------------------------------------------------------
     # Relevance analyses
+    #
+    # First compute BOTH correct and incorrect relevance.
+    # Plotting is done afterwards so the two topography figures can
+    # share exactly the same color scale.
     # ------------------------------------------------------------------
 
     subject_results: dict[
@@ -254,6 +261,23 @@ def plot_shap_for_subject(
             VectorRelevance,
             TrialCounts,
         ],
+    ] = {}
+
+    channel_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    channel_rankings_by_selection = {}
+
+    temporal_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    topographic_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
     ] = {}
 
     for trial_selection in TRIAL_SELECTIONS:
@@ -320,9 +344,85 @@ def plot_shap_for_subject(
             )
         )
 
-        # --------------------------------------------------------------
-        # Subject-wise plots
-        # --------------------------------------------------------------
+        subject_results[
+            trial_selection
+        ] = (
+            class_relevance,
+            frequency_relevance,
+            trial_counts,
+        )
+
+        channel_relevances[
+            trial_selection
+        ] = channel_relevance
+
+        channel_rankings_by_selection[
+            trial_selection
+        ] = channel_rankings
+
+        temporal_relevances[
+            trial_selection
+        ] = temporal_relevance
+
+        topographic_relevances[
+            trial_selection
+        ] = topographic_relevance
+
+    # ------------------------------------------------------------------
+    # Shared topography scale for correct + incorrect
+    # ------------------------------------------------------------------
+
+    topography_vmax = (
+        _compute_shared_topography_max(
+            topographic_relevances
+        )
+    )
+
+    print(
+        f"A{subject:02d}: "
+        f"shared topography vmax="
+        f"{topography_vmax:.8f}"
+    )
+
+    # ------------------------------------------------------------------
+    # Subject-wise plots
+    # ------------------------------------------------------------------
+
+    for trial_selection in TRIAL_SELECTIONS:
+        if trial_selection not in subject_results:
+            continue
+
+        (
+            _,
+            frequency_relevance,
+            trial_counts,
+        ) = subject_results[
+            trial_selection
+        ]
+
+        channel_relevance = (
+            channel_relevances[
+                trial_selection
+            ]
+        )
+
+        channel_rankings = (
+            channel_rankings_by_selection[
+                trial_selection
+            ]
+        )
+
+        temporal_relevance = (
+            temporal_relevances[
+                trial_selection
+            ]
+        )
+
+        topographic_relevance = (
+            topographic_relevances[
+                trial_selection
+            ]
+        )
 
         channel_relevance_figure = (
             plot_channel_relevance(
@@ -377,6 +477,8 @@ def plot_shap_for_subject(
                 subject=subject,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=trial_counts,
+                vmin=0.0,
+                vmax=topography_vmax,
             )
         )
 
@@ -440,14 +542,6 @@ def plot_shap_for_subject(
             topographies_figure
         )
 
-        subject_results[
-            trial_selection
-        ] = (
-            class_relevance,
-            frequency_relevance,
-            trial_counts,
-        )
-
         print(
             f"A{subject:02d} "
             f"({trial_selection}): "
@@ -491,7 +585,47 @@ def plot_mean_shap(
 ) -> None:
     """
     Compute and save global mean SHAP plots across subjects.
+
+    Correct and incorrect mean topographies use exactly the same
+    color scale.
     """
+
+    mean_class_relevances: dict[
+        TrialSelection,
+        ClassRelevance,
+    ] = {}
+
+    mean_frequency_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    mean_trial_counts_by_selection: dict[
+        TrialSelection,
+        TrialCounts,
+    ] = {}
+
+    channel_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    channel_rankings_by_selection = {}
+
+    temporal_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    topographic_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    # ------------------------------------------------------------------
+    # First compute BOTH correct and incorrect mean relevance.
+    # ------------------------------------------------------------------
+
     for trial_selection in TRIAL_SELECTIONS:
         class_relevance_list = (
             aggregated_class_relevance[
@@ -557,9 +691,97 @@ def plot_mean_shap(
             )
         )
 
-        # --------------------------------------------------------------
-        # Global mean plots
-        # --------------------------------------------------------------
+        mean_class_relevances[
+            trial_selection
+        ] = mean_class_relevance
+
+        mean_frequency_relevances[
+            trial_selection
+        ] = mean_frequency_relevance
+
+        mean_trial_counts_by_selection[
+            trial_selection
+        ] = mean_trial_counts
+
+        channel_relevances[
+            trial_selection
+        ] = channel_relevance
+
+        channel_rankings_by_selection[
+            trial_selection
+        ] = channel_rankings
+
+        temporal_relevances[
+            trial_selection
+        ] = temporal_relevance
+
+        topographic_relevances[
+            trial_selection
+        ] = topographic_relevance
+
+    # ------------------------------------------------------------------
+    # One shared color scale for the two mean figures.
+    #
+    # This is the important part for your thesis comparison.
+    # ------------------------------------------------------------------
+
+    topography_vmax = (
+        _compute_shared_topography_max(
+            topographic_relevances
+        )
+    )
+
+    print(
+        "Mean correct/incorrect shared "
+        f"topography vmax={topography_vmax:.8f}"
+    )
+
+    # ------------------------------------------------------------------
+    # Global mean plots
+    # ------------------------------------------------------------------
+
+    for trial_selection in TRIAL_SELECTIONS:
+        if (
+            trial_selection
+            not in mean_class_relevances
+        ):
+            continue
+
+        mean_frequency_relevance = (
+            mean_frequency_relevances[
+                trial_selection
+            ]
+        )
+
+        mean_trial_counts = (
+            mean_trial_counts_by_selection[
+                trial_selection
+            ]
+        )
+
+        channel_relevance = (
+            channel_relevances[
+                trial_selection
+            ]
+        )
+
+        channel_rankings = (
+            channel_rankings_by_selection[
+                trial_selection
+            ]
+        )
+
+        temporal_relevance = (
+            temporal_relevances[
+                trial_selection
+            ]
+        )
+
+        topographic_relevance = (
+            topographic_relevances[
+                trial_selection
+            ]
+        )
 
         channel_relevance_figure = (
             plot_channel_relevance(
@@ -614,6 +836,8 @@ def plot_mean_shap(
                 subject=None,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=mean_trial_counts,
+                vmin=0.0,
+                vmax=topography_vmax,
             )
         )
 
@@ -681,6 +905,44 @@ def plot_mean_shap(
             f"Saved mean SHAP plots "
             f"({trial_selection})."
         )
+
+
+def _compute_shared_topography_max(
+    topographic_relevances: Mapping[
+        TrialSelection,
+        VectorRelevance,
+    ],
+) -> float:
+    """
+    Compute one maximum relevance value across all available
+    trial selections and motor-imagery classes.
+
+    This allows correct and incorrect topographies to use the
+    same color scale.
+    """
+    maxima = [
+        float(
+            np.max(
+                class_relevance
+            )
+        )
+        for selection_relevance
+        in topographic_relevances.values()
+        for class_relevance
+        in selection_relevance.values()
+    ]
+
+    if not maxima:
+        return float(
+            np.finfo(float).eps
+        )
+
+    return max(
+        max(maxima),
+        float(
+            np.finfo(float).eps
+        ),
+    )
 
 
 def _get_trial_mask(

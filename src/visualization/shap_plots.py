@@ -221,6 +221,8 @@ def plot_topographies(
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
     show_channel_names: bool = False,
+    vmin: float = 0.0,
+    vmax: float | None = None,
 ) -> Figure:
     """
     Plot class-wise scalp topographies of SHAP relevance.
@@ -242,17 +244,18 @@ def plot_topographies(
 
     axes = axes.ravel()
 
-    maximum_relevance = max(
-        np.max(
-            topographic_relevance[
-                class_id
-            ]
+    if vmax is None:
+        vmax = max(
+            np.max(
+                topographic_relevance[
+                    class_id
+                ]
+            )
+            for class_id in class_ids
         )
-        for class_id in class_ids
-    )
 
-    maximum_relevance = max(
-        float(maximum_relevance),
+    vmax = max(
+        float(vmax),
         np.finfo(float).eps,
     )
 
@@ -291,8 +294,8 @@ def plot_topographies(
             contours=6,
             cmap="viridis",
             vlim=(
-                0.0,
-                maximum_relevance,
+                vmin,
+                vmax,
             ),
         )
 

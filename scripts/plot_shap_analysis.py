@@ -168,6 +168,7 @@ def plot_shap_for_subject(
                 time_shap_file
             )
         )
+
     else:
         background = select_shap_background(
             data=X_train,
@@ -221,6 +222,7 @@ def plot_shap_for_subject(
                 frequency_shap_file
             )
         )
+
     else:
         print(
             "Computing frequency-domain SHAP values for "
@@ -243,7 +245,7 @@ def plot_shap_for_subject(
         )
 
     # ------------------------------------------------------------------
-    # Compute relevance first for BOTH trial selections
+    # Compute relevance for BOTH correct and incorrect first
     # ------------------------------------------------------------------
 
     subject_results: dict[
@@ -263,6 +265,11 @@ def plot_shap_for_subject(
     channel_rankings_by_selection = {}
 
     temporal_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    frequency_relevances: dict[
         TrialSelection,
         VectorRelevance,
     ] = {}
@@ -356,12 +363,16 @@ def plot_shap_for_subject(
             trial_selection
         ] = temporal_relevance
 
+        frequency_relevances[
+            trial_selection
+        ] = frequency_relevance
+
         topographic_relevances[
             trial_selection
         ] = topographic_relevance
 
     # ------------------------------------------------------------------
-    # Shared scales: correct + incorrect
+    # Shared scales for correct + incorrect
     # ------------------------------------------------------------------
 
     channel_vmax = (
@@ -373,6 +384,12 @@ def plot_shap_for_subject(
     temporal_ymax = (
         _compute_shared_relevance_max(
             temporal_relevances
+        )
+    )
+
+    frequency_ymax = (
+        _compute_shared_relevance_max(
+            frequency_relevances
         )
     )
 
@@ -396,6 +413,12 @@ def plot_shap_for_subject(
 
     print(
         f"A{subject:02d}: "
+        f"shared frequency ymax="
+        f"{frequency_ymax:.8f}"
+    )
+
+    print(
+        f"A{subject:02d}: "
         f"shared topography vmax="
         f"{topography_vmax:.8f}"
     )
@@ -410,7 +433,7 @@ def plot_shap_for_subject(
 
         (
             _,
-            frequency_relevance,
+            _,
             trial_counts,
         ) = subject_results[
             trial_selection
@@ -430,6 +453,12 @@ def plot_shap_for_subject(
 
         temporal_relevance = (
             temporal_relevances[
+                trial_selection
+            ]
+        )
+
+        frequency_relevance = (
+            frequency_relevances[
                 trial_selection
             ]
         )
@@ -485,6 +514,8 @@ def plot_shap_for_subject(
                 trial_selection=trial_selection,
                 subject=subject,
                 trial_counts=trial_counts,
+                ymin=0.0,
+                ymax=frequency_ymax,
             )
         )
 
@@ -740,7 +771,7 @@ def plot_mean_shap(
         ] = topographic_relevance
 
     # ------------------------------------------------------------------
-    # Shared scales for correct + incorrect global mean plots
+    # Shared scales for correct + incorrect global plots
     # ------------------------------------------------------------------
 
     channel_vmax = (
@@ -752,6 +783,12 @@ def plot_mean_shap(
     temporal_ymax = (
         _compute_shared_relevance_max(
             temporal_relevances
+        )
+    )
+
+    frequency_ymax = (
+        _compute_shared_relevance_max(
+            mean_frequency_relevances
         )
     )
 
@@ -769,6 +806,11 @@ def plot_mean_shap(
     print(
         "Mean correct/incorrect shared "
         f"temporal ymax={temporal_ymax:.8f}"
+    )
+
+    print(
+        "Mean correct/incorrect shared "
+        f"frequency ymax={frequency_ymax:.8f}"
     )
 
     print(
@@ -868,6 +910,8 @@ def plot_mean_shap(
                 trial_selection=trial_selection,
                 subject=None,
                 trial_counts=mean_trial_counts,
+                ymin=0.0,
+                ymax=frequency_ymax,
             )
         )
 
@@ -1251,7 +1295,6 @@ def main() -> None:
             "No subject data available for "
             "mean SHAP plots."
         )
-
         return
 
     plot_mean_shap(

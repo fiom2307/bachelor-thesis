@@ -206,15 +206,20 @@ def plot_temporal_relevance(
 def plot_frequency_relevance(
     frequency_relevance: VectorRelevance,
     frequency_bands: tuple[
-        FrequencyBand,
+        tuple[float, float],
         ...,
     ],
     trial_selection: TrialSelection,
     subject: int | None,
     trial_counts: TrialCounts | None = None,
+    ymin: float = 0.0,
+    ymax: float | None = None,
 ) -> Figure:
     """
-    Plot class-wise SHAP relevance across frequency bands.
+    Plot class-wise frequency-domain EEGNet SHAP relevance.
+
+    A shared ymin/ymax can be supplied so correct and incorrect
+    trial selections use exactly the same vertical scale.
     """
     class_ids = _get_class_ids(
         frequency_relevance
@@ -224,62 +229,121 @@ def plot_frequency_relevance(
         class_ids
     )
 
-    band_labels = [
-        f"{low:g}–{high:g}"
-        for low, high in frequency_bands
-    ]
-
-    band_positions = np.arange(
-        len(frequency_bands)
+    n_bands = len(
+        frequency_bands
     )
 
+    if n_bands == 0:
+        raise ValueError(
+            "frequency_bands cannot be empty."
+        )
+
+    # ----------------------------------------------------------
+    # Frequency-band labels
+    # ----------------------------------------------------------
+
+    band_labels = [
+        f"{low:g}-{high:g}"
+        for low, high
+        in frequency_bands
+    ]
+
+    x_positions = np.arange(
+        n_bands
+    )
+
+    # ----------------------------------------------------------
+    # Shared Y-axis scale
+    # ----------------------------------------------------------
+
+    if ymax is None:
+        finite_values = []
+
+        for class_id in class_ids:
+            relevance = np.asarray(
+                frequency_relevance[
+                    class_id
+                ],
+                dtype=np.float64,
+            )
+
+            values = relevance[
+                np.isfinite(
+                    relevance
+                )
+            ]
+
+            if values.size > 0:
+                finite_values.append(
+                    values
+                )
+
+        if finite_values:
+            ymax = float(
+                np.max(
+                    np.concatenate(
+                        finite_values
+                    )
+                )
+            )
+        else:
+            ymax = float(
+                np.finfo(float).eps
+            )
+
+    ymax = max(
+        float(ymax),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+    if ymax <= ymin:
+        raise ValueError(
+            "ymax must be greater than ymin."
+        )
+
+    # ----------------------------------------------------------
+    # Figure
+    # ----------------------------------------------------------
+
     figure, axis = plt.subplots(
-        figsize=(11, 6),
+        figsize=(13, 7),
         constrained_layout=True,
     )
 
     for class_id in class_ids:
-        relevance = frequency_relevance[
-            class_id
-        ]
+        relevance = np.asarray(
+            frequency_relevance[
+                class_id
+            ],
+            dtype=np.float64,
+        )
 
-        if len(relevance) != len(
-            frequency_bands
+        if relevance.shape != (
+            n_bands,
         ):
             raise ValueError(
-                "The number of frequency relevance values "
-                "must match the number of frequency bands."
+                "Each frequency relevance array must "
+                "contain one value per frequency band."
             )
 
         axis.plot(
-            band_positions,
+            x_positions,
             relevance,
             marker="o",
-            linewidth=2,
             label=_get_class_title(
                 class_id,
                 trial_counts,
             ),
         )
 
-    axis.set_title(
-        _build_title(
-            base_title="EEGNet frequency-domain SHAP relevance",
-            trial_selection=trial_selection,
-            subject=subject,
-        )
-    )
-
-    axis.set_xlabel(
-        "Frequency band (Hz)"
-    )
-
-    axis.set_ylabel(
-        "Mean absolute SHAP value"
-    )
+    # ----------------------------------------------------------
+    # X-axis
+    # ----------------------------------------------------------
 
     axis.set_xticks(
-        band_positions
+        x_positions
     )
 
     axis.set_xticklabels(
@@ -288,12 +352,48 @@ def plot_frequency_relevance(
         ha="right",
     )
 
-    axis.grid(
-        alpha=0.25,
+    axis.set_xlabel(
+        "Frequency band (Hz)"
     )
+
+    # ----------------------------------------------------------
+    # Shared Y-axis
+    # ----------------------------------------------------------
+
+    axis.set_ylim(
+        ymin,
+        ymax,
+    )
+
+    axis.set_ylabel(
+        "Mean absolute SHAP value"
+    )
+
+    # ----------------------------------------------------------
+    # Title
+    # ----------------------------------------------------------
+
+    axis.set_title(
+        _build_title(
+            base_title=(
+                "EEGNet frequency-domain SHAP relevance"
+            ),
+            trial_selection=trial_selection,
+            subject=subject,
+        )
+    )
+
+    # ----------------------------------------------------------
+    # Legend + grid
+    # ----------------------------------------------------------
 
     axis.legend(
         title="Motor-imagery class",
+        loc="upper right",
+    )
+
+    axis.grid(
+        alpha=0.25,
     )
 
     return figure

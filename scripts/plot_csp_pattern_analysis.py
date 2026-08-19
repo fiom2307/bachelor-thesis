@@ -402,9 +402,6 @@ def _plot_temporal_relevance(
 ) -> None:
     """
     Plot temporal relevance for one trial selection.
-
-    Correct and incorrect plots can use the same
-    vertical relevance scale.
     """
     expected_shape = (
         len(CLASS_NAMES),
@@ -417,19 +414,6 @@ def _plot_temporal_relevance(
             f"with shape {expected_shape}, "
             f"but received "
             f"{temporal_relevance.shape}."
-        )
-
-    class_counts = np.asarray(
-        class_counts,
-        dtype=int,
-    )
-
-    if class_counts.shape != (
-        len(CLASS_NAMES),
-    ):
-        raise ValueError(
-            "Expected one trial count for each "
-            "motor-imagery class."
         )
 
     temporal_relevance_path = (
@@ -457,12 +441,17 @@ def _plot_temporal_relevance(
 def _plot_frequency_relevance(
     frequency_relevance: np.ndarray,
     frequencies: np.ndarray,
+    class_counts: np.ndarray,
     subject_name: str,
     selection: str,
     subject: int | None,
+    ymax: float,
 ) -> None:
     """
     Plot frequency relevance for one trial selection.
+
+    Correct and incorrect plots can use exactly
+    the same vertical relevance scale.
     """
     expected_shape = (
         len(CLASS_NAMES),
@@ -475,6 +464,19 @@ def _plot_frequency_relevance(
             f"with shape {expected_shape}, "
             f"but received "
             f"{frequency_relevance.shape}."
+        )
+
+    class_counts = np.asarray(
+        class_counts,
+        dtype=int,
+    )
+
+    if class_counts.shape != (
+        len(CLASS_NAMES),
+    ):
+        raise ValueError(
+            "Expected one trial count for each "
+            "motor-imagery class."
         )
 
     frequency_relevance_path = (
@@ -493,6 +495,9 @@ def _plot_frequency_relevance(
         output_dir=(
             frequency_relevance_path.parent
         ),
+        class_counts=class_counts,
+        ymin=0.0,
+        ymax=ymax,
     )
 
 
@@ -522,7 +527,7 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
-    # LOAD MODELS AND DATA
+    # LOAD MODELS + DATA
     # ==========================================================
 
     csps, ldas = _load_subject_models(
@@ -657,10 +662,6 @@ def plot_subject_analysis(
             "spatial and temporal relevance."
         )
 
-    # ==========================================================
-    # SHARED TEMPORAL Y-AXIS
-    # ==========================================================
-
     temporal_ymax = _compute_shared_max(
         correct_temporal_relevance,
         incorrect_temporal_relevance,
@@ -749,14 +750,30 @@ def plot_subject_analysis(
             "spatial and frequency relevance."
         )
 
+    # ==========================================================
+    # SHARED FREQUENCY Y-AXIS
+    # ==========================================================
+
+    frequency_ymax = _compute_shared_max(
+        correct_frequency_relevance,
+        incorrect_frequency_relevance,
+    )
+
+    print(
+        f"{subject_name} shared frequency ymax: "
+        f"{frequency_ymax:.6f}"
+    )
+
     _plot_frequency_relevance(
         frequency_relevance=(
             correct_frequency_relevance
         ),
         frequencies=frequencies,
+        class_counts=correct_counts,
         subject_name=subject_name,
         selection="correct",
         subject=subject,
+        ymax=frequency_ymax,
     )
 
     _plot_frequency_relevance(
@@ -764,9 +781,11 @@ def plot_subject_analysis(
             incorrect_frequency_relevance
         ),
         frequencies=frequencies,
+        class_counts=incorrect_counts,
         subject_name=subject_name,
         selection="incorrect",
         subject=subject,
+        ymax=frequency_ymax,
     )
 
     return (
@@ -939,10 +958,6 @@ def plot_global_analysis(
         mean_correct_temporal_relevance.shape[1]
     )
 
-    # ==========================================================
-    # GLOBAL SHARED TEMPORAL Y-AXIS
-    # ==========================================================
-
     global_temporal_ymax = _compute_shared_max(
         mean_correct_temporal_relevance,
         mean_incorrect_temporal_relevance,
@@ -1034,14 +1049,30 @@ def plot_global_analysis(
         axis=0,
     )
 
+    # ==========================================================
+    # GLOBAL SHARED FREQUENCY Y-AXIS
+    # ==========================================================
+
+    global_frequency_ymax = _compute_shared_max(
+        mean_correct_frequency_relevance,
+        mean_incorrect_frequency_relevance,
+    )
+
+    print(
+        "Global correct/incorrect shared frequency "
+        f"ymax: {global_frequency_ymax:.6f}"
+    )
+
     _plot_frequency_relevance(
         frequency_relevance=(
             mean_correct_frequency_relevance
         ),
         frequencies=reference_frequencies,
+        class_counts=total_correct_counts,
         subject_name="all_mean",
         selection="correct",
         subject=None,
+        ymax=global_frequency_ymax,
     )
 
     _plot_frequency_relevance(
@@ -1049,9 +1080,11 @@ def plot_global_analysis(
             mean_incorrect_frequency_relevance
         ),
         frequencies=reference_frequencies,
+        class_counts=total_incorrect_counts,
         subject_name="all_mean",
         selection="incorrect",
         subject=None,
+        ymax=global_frequency_ymax,
     )
 
 

@@ -2,13 +2,16 @@ import joblib
 import numpy as np
 
 from src.analysis.csp_pattern_analysis.channel_relevance import (
-    compute_channel_relevance,
+    aggregate_trial_channel_relevance,
+    compute_trial_channel_relevance,
 )
 from src.analysis.csp_pattern_analysis.frequency_relevance import (
-    compute_frequency_relevance,
+    aggregate_trial_frequency_relevance,
+    compute_trial_frequency_relevance,
 )
 from src.analysis.csp_pattern_analysis.temporal_relevance import (
-    compute_temporal_relevance,
+    aggregate_trial_temporal_relevance,
+    compute_trial_temporal_relevance,
 )
 from src.data.dataset import get_data_for_subject
 from src.utils.paths import (
@@ -230,9 +233,195 @@ def _create_times(
     )
 
 
+def _plot_spatial_relevance(
+    channel_relevance: np.ndarray,
+    subject_name: str,
+    selection: str,
+    subject: int | None,
+) -> None:
+    """
+    Plot channel relevance, channel rankings, and
+    scalp topographies for one trial selection.
+    """
+    expected_shape = (
+        len(CLASS_NAMES),
+        len(CHANNEL_NAMES),
+    )
+
+    if (
+        channel_relevance.shape
+        != expected_shape
+    ):
+        raise ValueError(
+            "Expected class-wise channel relevance "
+            f"with shape {expected_shape}, "
+            f"but received "
+            f"{channel_relevance.shape}."
+        )
+
+    plot_subject = (
+        f"{subject_name}_{selection}"
+    )
+
+    # ==========================================================
+    # CHANNEL RELEVANCE
+    # ==========================================================
+
+    channel_relevance_path = (
+        get_csp_channel_relevance_path(
+            subject
+        )
+    )
+
+    plot_csp_channel_relevance(
+        channel_relevance=channel_relevance,
+        channel_names=CHANNEL_NAMES,
+        class_names=CLASS_NAMES,
+        subject=plot_subject,
+        output_dir=(
+            channel_relevance_path.parent
+        ),
+    )
+
+    # ==========================================================
+    # CHANNEL RANKINGS
+    # ==========================================================
+
+    channel_rankings_path = (
+        get_csp_channel_rankings_path(
+            subject
+        )
+    )
+
+    plot_csp_channel_rankings(
+        channel_relevance=channel_relevance,
+        channel_names=CHANNEL_NAMES,
+        class_names=CLASS_NAMES,
+        subject=plot_subject,
+        output_dir=(
+            channel_rankings_path.parent
+        ),
+        top_n=10,
+    )
+
+    # ==========================================================
+    # TOPOGRAPHIES
+    # ==========================================================
+
+    topographies_path = (
+        get_csp_topographies_path(
+            subject
+        )
+    )
+
+    plot_csp_topographies(
+        channel_relevance=channel_relevance,
+        channel_names=CHANNEL_NAMES,
+        class_names=CLASS_NAMES,
+        subject=plot_subject,
+        output_dir=(
+            topographies_path.parent
+        ),
+        sfreq=SFREQ,
+    )
+
+
+def _plot_temporal_relevance(
+    temporal_relevance: np.ndarray,
+    times: np.ndarray,
+    subject_name: str,
+    selection: str,
+    subject: int | None,
+) -> None:
+    """
+    Plot temporal relevance for one trial selection.
+    """
+    expected_shape = (
+        len(CLASS_NAMES),
+        len(times),
+    )
+
+    if (
+        temporal_relevance.shape
+        != expected_shape
+    ):
+        raise ValueError(
+            "Expected class-wise temporal relevance "
+            f"with shape {expected_shape}, "
+            f"but received "
+            f"{temporal_relevance.shape}."
+        )
+
+    temporal_relevance_path = (
+        get_csp_temporal_relevance_path(
+            subject
+        )
+    )
+
+    plot_csp_temporal_relevance(
+        temporal_relevance=temporal_relevance,
+        times=times,
+        class_names=CLASS_NAMES,
+        subject=(
+            f"{subject_name}_{selection}"
+        ),
+        output_dir=(
+            temporal_relevance_path.parent
+        ),
+    )
+
+
+def _plot_frequency_relevance(
+    frequency_relevance: np.ndarray,
+    frequencies: np.ndarray,
+    subject_name: str,
+    selection: str,
+    subject: int | None,
+) -> None:
+    """
+    Plot frequency relevance for one trial selection.
+    """
+    expected_shape = (
+        len(CLASS_NAMES),
+        len(frequencies),
+    )
+
+    if (
+        frequency_relevance.shape
+        != expected_shape
+    ):
+        raise ValueError(
+            "Expected class-wise frequency relevance "
+            f"with shape {expected_shape}, "
+            f"but received "
+            f"{frequency_relevance.shape}."
+        )
+
+    frequency_relevance_path = (
+        get_csp_frequency_relevance_path(
+            subject
+        )
+    )
+
+    plot_csp_frequency_relevance(
+        frequency_relevance=frequency_relevance,
+        frequencies=frequencies,
+        class_names=CLASS_NAMES,
+        subject=(
+            f"{subject_name}_{selection}"
+        ),
+        output_dir=(
+            frequency_relevance_path.parent
+        ),
+    )
+
+
 def plot_subject_analysis(
     subject: int,
 ) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
     np.ndarray,
     np.ndarray,
     np.ndarray,
@@ -259,85 +448,6 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
-    # CHANNEL RELEVANCE
-    # ==========================================================
-
-    channel_relevance = (
-        compute_channel_relevance(
-            csps=csps,
-            ldas=ldas,
-        )
-    )
-
-    expected_channel_shape = (
-        len(CLASS_NAMES),
-        len(CHANNEL_NAMES),
-    )
-
-    if (
-        channel_relevance.shape
-        != expected_channel_shape
-    ):
-        raise ValueError(
-            "Expected class-wise channel relevance "
-            f"with shape {expected_channel_shape}, "
-            f"but received "
-            f"{channel_relevance.shape}."
-        )
-
-    channel_relevance_path = (
-        get_csp_channel_relevance_path(
-            subject
-        )
-    )
-
-    plot_csp_channel_relevance(
-        channel_relevance=channel_relevance,
-        channel_names=CHANNEL_NAMES,
-        class_names=CLASS_NAMES,
-        subject=subject_name,
-        output_dir=(
-            channel_relevance_path.parent
-        ),
-    )
-
-    topographies_path = (
-        get_csp_topographies_path(
-            subject
-        )
-    )
-
-    plot_csp_topographies(
-        channel_relevance=channel_relevance,
-        channel_names=CHANNEL_NAMES,
-        class_names=CLASS_NAMES,
-        subject=subject_name,
-        output_dir=topographies_path.parent,
-        sfreq=SFREQ,
-    )
-
-    # ==========================================================
-    # CHANNEL RANKINGS
-    # ==========================================================
-
-    channel_rankings_path = (
-        get_csp_channel_rankings_path(
-            subject
-        )
-    )
-
-    plot_csp_channel_rankings(
-        channel_relevance=channel_relevance,
-        channel_names=CHANNEL_NAMES,
-        class_names=CLASS_NAMES,
-        subject=subject_name,
-        output_dir=(
-            channel_rankings_path.parent
-        ),
-        top_n=10,
-    )
-
-    # ==========================================================
     # LOAD EVALUATION DATA
     # ==========================================================
 
@@ -347,12 +457,16 @@ def plot_subject_analysis(
         )
     )
 
+    times = _create_times(
+        X_eval.shape[2]
+    )
+
     # ==========================================================
-    # TEMPORAL RELEVANCE
+    # TRIAL-WISE SPATIAL RELEVANCE
     # ==========================================================
 
-    temporal_relevance = (
-        compute_temporal_relevance(
+    trial_channel_result = (
+        compute_trial_channel_relevance(
             csps=csps,
             ldas=ldas,
             data=X_eval,
@@ -360,107 +474,251 @@ def plot_subject_analysis(
         )
     )
 
-    expected_temporal_shape = (
-        len(CLASS_NAMES),
-        X_eval.shape[2],
+    (
+        correct_channel_relevance,
+        correct_counts,
+    ) = aggregate_trial_channel_relevance(
+        result=trial_channel_result,
+        mask=trial_channel_result.correct_mask,
     )
-
-    if (
-        temporal_relevance.shape
-        != expected_temporal_shape
-    ):
-        raise ValueError(
-            "Expected class-wise temporal relevance "
-            f"with shape {expected_temporal_shape}, "
-            f"but received "
-            f"{temporal_relevance.shape}."
-        )
-
-    times = _create_times(
-        X_eval.shape[2]
-    )
-
-    temporal_relevance_path = (
-        get_csp_temporal_relevance_path(
-            subject
-        )
-    )
-
-    plot_csp_temporal_relevance(
-        temporal_relevance=temporal_relevance,
-        times=times,
-        class_names=CLASS_NAMES,
-        subject=subject_name,
-        output_dir=(
-            temporal_relevance_path.parent
-        ),
-    )
-
-    # ==========================================================
-    # FREQUENCY RELEVANCE
-    # ==========================================================
 
     (
-        frequency_relevance,
-        frequencies,
-    ) = compute_frequency_relevance(
-        csps=csps,
-        ldas=ldas,
-        data=X_eval,
-        labels=y_eval,
-        sfreq=SFREQ,
-        fmin=FMIN,
-        fmax=FMAX,
+        incorrect_channel_relevance,
+        incorrect_counts,
+    ) = aggregate_trial_channel_relevance(
+        result=trial_channel_result,
+        mask=trial_channel_result.incorrect_mask,
     )
 
-    expected_frequency_shape = (
-        len(CLASS_NAMES),
-        len(frequencies),
+    print(
+        f"{subject_name} correct counts: "
+        f"{correct_counts}"
     )
 
-    if (
-        frequency_relevance.shape
-        != expected_frequency_shape
+    print(
+        f"{subject_name} incorrect counts: "
+        f"{incorrect_counts}"
+    )
+
+    # ==========================================================
+    # CORRECT SPATIAL RELEVANCE
+    # ==========================================================
+
+    _plot_spatial_relevance(
+        channel_relevance=(
+            correct_channel_relevance
+        ),
+        subject_name=subject_name,
+        selection="correct",
+        subject=subject,
+    )
+
+    # ==========================================================
+    # INCORRECT SPATIAL RELEVANCE
+    # ==========================================================
+
+    _plot_spatial_relevance(
+        channel_relevance=(
+            incorrect_channel_relevance
+        ),
+        subject_name=subject_name,
+        selection="incorrect",
+        subject=subject,
+    )
+
+    # ==========================================================
+    # TRIAL-WISE TEMPORAL RELEVANCE
+    # ==========================================================
+
+    trial_temporal_result = (
+        compute_trial_temporal_relevance(
+            csps=csps,
+            ldas=ldas,
+            data=X_eval,
+            labels=y_eval,
+        )
+    )
+
+    (
+        correct_temporal_relevance,
+        correct_temporal_counts,
+    ) = aggregate_trial_temporal_relevance(
+        result=trial_temporal_result,
+        mask=trial_temporal_result.correct_mask,
+    )
+
+    (
+        incorrect_temporal_relevance,
+        incorrect_temporal_counts,
+    ) = aggregate_trial_temporal_relevance(
+        result=trial_temporal_result,
+        mask=trial_temporal_result.incorrect_mask,
+    )
+
+    # ==========================================================
+    # CHECK TEMPORAL COUNTS
+    # ==========================================================
+
+    if not np.array_equal(
+        correct_counts,
+        correct_temporal_counts,
     ):
         raise ValueError(
-            "Expected class-wise frequency relevance "
-            f"with shape {expected_frequency_shape}, "
-            f"but received "
-            f"{frequency_relevance.shape}."
+            "Correct trial counts differ between "
+            "spatial and temporal relevance."
         )
 
-    frequency_relevance_path = (
-        get_csp_frequency_relevance_path(
-            subject
+    if not np.array_equal(
+        incorrect_counts,
+        incorrect_temporal_counts,
+    ):
+        raise ValueError(
+            "Incorrect trial counts differ between "
+            "spatial and temporal relevance."
+        )
+
+    # ==========================================================
+    # CORRECT TEMPORAL RELEVANCE
+    # ==========================================================
+
+    _plot_temporal_relevance(
+        temporal_relevance=(
+            correct_temporal_relevance
+        ),
+        times=times,
+        subject_name=subject_name,
+        selection="correct",
+        subject=subject,
+    )
+
+    # ==========================================================
+    # INCORRECT TEMPORAL RELEVANCE
+    # ==========================================================
+
+    _plot_temporal_relevance(
+        temporal_relevance=(
+            incorrect_temporal_relevance
+        ),
+        times=times,
+        subject_name=subject_name,
+        selection="incorrect",
+        subject=subject,
+    )
+
+    # ==========================================================
+    # TRIAL-WISE FREQUENCY RELEVANCE
+    # ==========================================================
+
+    trial_frequency_result = (
+        compute_trial_frequency_relevance(
+            csps=csps,
+            ldas=ldas,
+            data=X_eval,
+            labels=y_eval,
+            sfreq=SFREQ,
+            fmin=FMIN,
+            fmax=FMAX,
         )
     )
 
-    plot_csp_frequency_relevance(
-        frequency_relevance=frequency_relevance,
-        frequencies=frequencies,
-        class_names=CLASS_NAMES,
-        subject=subject_name,
-        output_dir=(
-            frequency_relevance_path.parent
+    (
+        correct_frequency_relevance,
+        correct_frequency_counts,
+    ) = aggregate_trial_frequency_relevance(
+        result=trial_frequency_result,
+        mask=trial_frequency_result.correct_mask,
+    )
+
+    (
+        incorrect_frequency_relevance,
+        incorrect_frequency_counts,
+    ) = aggregate_trial_frequency_relevance(
+        result=trial_frequency_result,
+        mask=trial_frequency_result.incorrect_mask,
+    )
+
+    frequencies = (
+        trial_frequency_result.frequencies
+    )
+
+    # ==========================================================
+    # CHECK FREQUENCY COUNTS
+    # ==========================================================
+
+    if not np.array_equal(
+        correct_counts,
+        correct_frequency_counts,
+    ):
+        raise ValueError(
+            "Correct trial counts differ between "
+            "spatial and frequency relevance."
+        )
+
+    if not np.array_equal(
+        incorrect_counts,
+        incorrect_frequency_counts,
+    ):
+        raise ValueError(
+            "Incorrect trial counts differ between "
+            "spatial and frequency relevance."
+        )
+
+    # ==========================================================
+    # CORRECT FREQUENCY RELEVANCE
+    # ==========================================================
+
+    _plot_frequency_relevance(
+        frequency_relevance=(
+            correct_frequency_relevance
         ),
+        frequencies=frequencies,
+        subject_name=subject_name,
+        selection="correct",
+        subject=subject,
+    )
+
+    # ==========================================================
+    # INCORRECT FREQUENCY RELEVANCE
+    # ==========================================================
+
+    _plot_frequency_relevance(
+        frequency_relevance=(
+            incorrect_frequency_relevance
+        ),
+        frequencies=frequencies,
+        subject_name=subject_name,
+        selection="incorrect",
+        subject=subject,
     )
 
     return (
-        channel_relevance,
-        temporal_relevance,
-        frequency_relevance,
+        correct_channel_relevance,
+        incorrect_channel_relevance,
+        correct_temporal_relevance,
+        incorrect_temporal_relevance,
+        correct_frequency_relevance,
+        incorrect_frequency_relevance,
         frequencies,
     )
 
 
 def plot_global_analysis(
-    subject_channel_relevances: list[
+    subject_correct_channel_relevances: list[
         np.ndarray
     ],
-    subject_temporal_relevances: list[
+    subject_incorrect_channel_relevances: list[
         np.ndarray
     ],
-    subject_frequency_relevances: list[
+    subject_correct_temporal_relevances: list[
+        np.ndarray
+    ],
+    subject_incorrect_temporal_relevances: list[
+        np.ndarray
+    ],
+    subject_correct_frequency_relevances: list[
+        np.ndarray
+    ],
+    subject_incorrect_frequency_relevances: list[
         np.ndarray
     ],
     subject_frequencies: list[
@@ -472,128 +730,126 @@ def plot_global_analysis(
     """
 
     # ==========================================================
-    # GLOBAL CHANNEL RELEVANCE
+    # GLOBAL CORRECT SPATIAL RELEVANCE
     # ==========================================================
 
-    mean_channel_relevance = np.mean(
+    mean_correct_channel_relevance = np.nanmean(
         np.stack(
-            subject_channel_relevances,
+            subject_correct_channel_relevances,
             axis=0,
         ),
         axis=0,
     )
 
-    channel_relevance_path = (
-        get_csp_channel_relevance_path(
-            None
-        )
-    )
-
-    plot_csp_channel_relevance(
-        channel_relevance=mean_channel_relevance,
-        channel_names=CHANNEL_NAMES,
-        class_names=CLASS_NAMES,
-        subject="all_mean",
-        output_dir=(
-            channel_relevance_path.parent
+    _plot_spatial_relevance(
+        channel_relevance=(
+            mean_correct_channel_relevance
         ),
-    )
-
-    topographies_path = (
-        get_csp_topographies_path(
-            None
-        )
-    )
-
-    plot_csp_topographies(
-        channel_relevance=mean_channel_relevance,
-        channel_names=CHANNEL_NAMES,
-        class_names=CLASS_NAMES,
-        subject="all_mean",
-        output_dir=topographies_path.parent,
-        sfreq=SFREQ,
+        subject_name="all_mean",
+        selection="correct",
+        subject=None,
     )
 
     # ==========================================================
-    # GLOBAL CHANNEL RANKINGS
+    # GLOBAL INCORRECT SPATIAL RELEVANCE
     # ==========================================================
 
-    channel_rankings_path = (
-        get_csp_channel_rankings_path(
-            None
-        )
-    )
-
-    plot_csp_channel_rankings(
-        channel_relevance=mean_channel_relevance,
-        channel_names=CHANNEL_NAMES,
-        class_names=CLASS_NAMES,
-        subject="all_mean",
-        output_dir=(
-            channel_rankings_path.parent
+    mean_incorrect_channel_relevance = np.nanmean(
+        np.stack(
+            subject_incorrect_channel_relevances,
+            axis=0,
         ),
-        top_n=10,
+        axis=0,
+    )
+
+    _plot_spatial_relevance(
+        channel_relevance=(
+            mean_incorrect_channel_relevance
+        ),
+        subject_name="all_mean",
+        selection="incorrect",
+        subject=None,
     )
 
     # ==========================================================
-    # GLOBAL TEMPORAL RELEVANCE
+    # CHECK TEMPORAL SHAPES
     # ==========================================================
 
-    temporal_shapes = {
+    correct_temporal_shapes = {
         relevance.shape
         for relevance
-        in subject_temporal_relevances
+        in subject_correct_temporal_relevances
     }
 
-    if len(temporal_shapes) != 1:
+    if len(correct_temporal_shapes) != 1:
         raise ValueError(
-            "All subjects must have temporal relevance "
-            "arrays with the same shape."
+            "All subjects must have correct temporal "
+            "relevance arrays with the same shape."
         )
 
-    mean_temporal_relevance = np.mean(
+    incorrect_temporal_shapes = {
+        relevance.shape
+        for relevance
+        in subject_incorrect_temporal_relevances
+    }
+
+    if len(incorrect_temporal_shapes) != 1:
+        raise ValueError(
+            "All subjects must have incorrect temporal "
+            "relevance arrays with the same shape."
+        )
+
+    # ==========================================================
+    # GLOBAL CORRECT TEMPORAL RELEVANCE
+    # ==========================================================
+
+    mean_correct_temporal_relevance = np.nanmean(
         np.stack(
-            subject_temporal_relevances,
+            subject_correct_temporal_relevances,
             axis=0,
         ),
         axis=0,
     )
 
     times = _create_times(
-        mean_temporal_relevance.shape[1]
+        mean_correct_temporal_relevance.shape[1]
     )
 
-    temporal_relevance_path = (
-        get_csp_temporal_relevance_path(
-            None
-        )
-    )
-
-    plot_csp_temporal_relevance(
-        temporal_relevance=mean_temporal_relevance,
-        times=times,
-        class_names=CLASS_NAMES,
-        subject="all_mean",
-        output_dir=(
-            temporal_relevance_path.parent
+    _plot_temporal_relevance(
+        temporal_relevance=(
+            mean_correct_temporal_relevance
         ),
+        times=times,
+        subject_name="all_mean",
+        selection="correct",
+        subject=None,
     )
 
     # ==========================================================
-    # GLOBAL FREQUENCY RELEVANCE
+    # GLOBAL INCORRECT TEMPORAL RELEVANCE
     # ==========================================================
 
-    frequency_shapes = {
-        relevance.shape
-        for relevance
-        in subject_frequency_relevances
-    }
+    mean_incorrect_temporal_relevance = np.nanmean(
+        np.stack(
+            subject_incorrect_temporal_relevances,
+            axis=0,
+        ),
+        axis=0,
+    )
 
-    if len(frequency_shapes) != 1:
-        raise ValueError(
-            "All subjects must have frequency relevance "
-            "arrays with the same shape."
-        )
+    _plot_temporal_relevance(
+        temporal_relevance=(
+            mean_incorrect_temporal_relevance
+        ),
+        times=times,
+        subject_name="all_mean",
+        selection="incorrect",
+        subject=None,
+    )
+
+    # ==========================================================
+    # CHECK FREQUENCY BINS
+    # ==========================================================
 
     reference_frequencies = (
         subject_frequencies[0]
@@ -608,30 +864,76 @@ def plot_global_analysis(
                 "Frequency bins differ between subjects."
             )
 
-    mean_frequency_relevance = np.mean(
+    # ==========================================================
+    # CHECK FREQUENCY SHAPES
+    # ==========================================================
+
+    correct_frequency_shapes = {
+        relevance.shape
+        for relevance
+        in subject_correct_frequency_relevances
+    }
+
+    if len(correct_frequency_shapes) != 1:
+        raise ValueError(
+            "All subjects must have correct frequency "
+            "relevance arrays with the same shape."
+        )
+
+    incorrect_frequency_shapes = {
+        relevance.shape
+        for relevance
+        in subject_incorrect_frequency_relevances
+    }
+
+    if len(incorrect_frequency_shapes) != 1:
+        raise ValueError(
+            "All subjects must have incorrect frequency "
+            "relevance arrays with the same shape."
+        )
+
+    # ==========================================================
+    # GLOBAL CORRECT FREQUENCY RELEVANCE
+    # ==========================================================
+
+    mean_correct_frequency_relevance = np.nanmean(
         np.stack(
-            subject_frequency_relevances,
+            subject_correct_frequency_relevances,
             axis=0,
         ),
         axis=0,
     )
 
-    frequency_relevance_path = (
-        get_csp_frequency_relevance_path(
-            None
-        )
-    )
-
-    plot_csp_frequency_relevance(
+    _plot_frequency_relevance(
         frequency_relevance=(
-            mean_frequency_relevance
+            mean_correct_frequency_relevance
         ),
         frequencies=reference_frequencies,
-        class_names=CLASS_NAMES,
-        subject="all_mean",
-        output_dir=(
-            frequency_relevance_path.parent
+        subject_name="all_mean",
+        selection="correct",
+        subject=None,
+    )
+
+    # ==========================================================
+    # GLOBAL INCORRECT FREQUENCY RELEVANCE
+    # ==========================================================
+
+    mean_incorrect_frequency_relevance = np.nanmean(
+        np.stack(
+            subject_incorrect_frequency_relevances,
+            axis=0,
         ),
+        axis=0,
+    )
+
+    _plot_frequency_relevance(
+        frequency_relevance=(
+            mean_incorrect_frequency_relevance
+        ),
+        frequencies=reference_frequencies,
+        subject_name="all_mean",
+        selection="incorrect",
+        subject=None,
     )
 
 
@@ -640,31 +942,52 @@ def main() -> None:
     Generate subject-wise and global
     CSP pattern analysis plots.
     """
-    subject_channel_relevances = []
-    subject_temporal_relevances = []
-    subject_frequency_relevances = []
+    subject_correct_channel_relevances = []
+    subject_incorrect_channel_relevances = []
+
+    subject_correct_temporal_relevances = []
+    subject_incorrect_temporal_relevances = []
+
+    subject_correct_frequency_relevances = []
+    subject_incorrect_frequency_relevances = []
+
     subject_frequencies = []
 
     for subject in SUBJECTS:
         (
-            channel_relevance,
-            temporal_relevance,
-            frequency_relevance,
+            correct_channel_relevance,
+            incorrect_channel_relevance,
+            correct_temporal_relevance,
+            incorrect_temporal_relevance,
+            correct_frequency_relevance,
+            incorrect_frequency_relevance,
             frequencies,
         ) = plot_subject_analysis(
             subject
         )
 
-        subject_channel_relevances.append(
-            channel_relevance
+        subject_correct_channel_relevances.append(
+            correct_channel_relevance
         )
 
-        subject_temporal_relevances.append(
-            temporal_relevance
+        subject_incorrect_channel_relevances.append(
+            incorrect_channel_relevance
         )
 
-        subject_frequency_relevances.append(
-            frequency_relevance
+        subject_correct_temporal_relevances.append(
+            correct_temporal_relevance
+        )
+
+        subject_incorrect_temporal_relevances.append(
+            incorrect_temporal_relevance
+        )
+
+        subject_correct_frequency_relevances.append(
+            correct_frequency_relevance
+        )
+
+        subject_incorrect_frequency_relevances.append(
+            incorrect_frequency_relevance
         )
 
         subject_frequencies.append(
@@ -676,14 +999,23 @@ def main() -> None:
     )
 
     plot_global_analysis(
-        subject_channel_relevances=(
-            subject_channel_relevances
+        subject_correct_channel_relevances=(
+            subject_correct_channel_relevances
         ),
-        subject_temporal_relevances=(
-            subject_temporal_relevances
+        subject_incorrect_channel_relevances=(
+            subject_incorrect_channel_relevances
         ),
-        subject_frequency_relevances=(
-            subject_frequency_relevances
+        subject_correct_temporal_relevances=(
+            subject_correct_temporal_relevances
+        ),
+        subject_incorrect_temporal_relevances=(
+            subject_incorrect_temporal_relevances
+        ),
+        subject_correct_frequency_relevances=(
+            subject_correct_frequency_relevances
+        ),
+        subject_incorrect_frequency_relevances=(
+            subject_incorrect_frequency_relevances
         ),
         subject_frequencies=(
             subject_frequencies

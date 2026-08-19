@@ -3,196 +3,245 @@ from mne.decoding import CSP
 from sklearn.discriminant_analysis import (
     LinearDiscriminantAnalysis,
 )
+from dataclasses import dataclass
 
 
-def compute_fold_channel_relevance(
-    csp: CSP,
-    lda: LinearDiscriminantAnalysis,
-) -> np.ndarray:
+@dataclass(frozen=True)
+class TrialChannelRelevanceResult:
     """
-    Compute class-wise channel relevance for one CSP+LDA fold.
-
-    CSP spatial patterns describe how each CSP component is
-    expressed across EEG channels. LDA coefficients describe
-    how strongly each CSP feature contributes to each class.
-
-    Returns
-    -------
-    channel_relevance : np.ndarray
-        Class-wise normalized channel relevance.
-        Shape: (n_classes, n_channels).
+    Trial-wise CSP+LDA channel relevance for one subject.
     """
-    n_components = csp.n_components
 
-    patterns = np.asarray(
-        csp.patterns_[:n_components],
-        dtype=np.float64,
-    )
+    values: np.ndarray
+    predictions: np.ndarray
+    labels: np.ndarray
 
-    coefficients = np.asarray(
-        lda.coef_,
-        dtype=np.float64,
-    )
+    @property
+    def correct_mask(self) -> np.ndarray:
+        return self.predictions == self.labels
 
-    if coefficients.ndim == 1:
-        coefficients = coefficients[
-            np.newaxis,
-            :
-        ]
-
-    if coefficients.shape[1] != n_components:
-        raise ValueError(
-            "Number of LDA features does not match "
-            "the number of CSP components."
-        )
-
-    # ----------------------------------------------------------
-    # CSP spatial relevance
-    # ----------------------------------------------------------
-
-    # Square patterns to remove CSP sign ambiguity.
-    pattern_relevance = patterns**2
-
-    # Normalize each CSP component across EEG channels.
-    pattern_sums = np.sum(
-        pattern_relevance,
-        axis=1,
-        keepdims=True,
-    )
-
-    pattern_sums = np.maximum(
-        pattern_sums,
-        np.finfo(np.float64).eps,
-    )
-
-    pattern_relevance = (
-        pattern_relevance
-        / pattern_sums
-    )
-
-    # ----------------------------------------------------------
-    # Class-wise LDA component relevance
-    # ----------------------------------------------------------
-
-    # Absolute coefficient magnitude:
-    # (n_classes, n_components)
-    component_relevance = np.abs(
-        coefficients
-    )
-
-    # ----------------------------------------------------------
-    # Project CSP component relevance back to EEG channels
-    # ----------------------------------------------------------
-
-    # (n_classes, n_components)
-    # @
-    # (n_components, n_channels)
-    #
-    # ->
-    # (n_classes, n_channels)
-    channel_relevance = (
-        component_relevance
-        @ pattern_relevance
-    )
-
-    # Normalize each class independently across channels.
-    class_sums = np.sum(
-        channel_relevance,
-        axis=1,
-        keepdims=True,
-    )
-
-    class_sums = np.maximum(
-        class_sums,
-        np.finfo(np.float64).eps,
-    )
-
-    channel_relevance = (
-        channel_relevance
-        / class_sums
-    )
-
-    return channel_relevance
+    @property
+    def incorrect_mask(self) -> np.ndarray:
+        return self.predictions != self.labels
 
 
-def compute_channel_relevance(
+def compute_trial_channel_relevance(
     csps: list[CSP],
     ldas: list[LinearDiscriminantAnalysis],
-) -> np.ndarray:
+    data: np.ndarray,
+    labels: np.ndarray,
+) -> TrialChannelRelevanceResult:
     """
-    Compute mean class-wise channel relevance across CSP+LDA folds.
+    Compute trial-wise CSP+LDA spatial relevance.
 
-    Each fold is interpreted separately before averaging.
-
-    Parameters
-    ----------
-    csps : list[CSP]
-        CSP models from all folds.
-
-    ldas : list[LinearDiscriminantAnalysis]
-        Corresponding LDA models from all folds.
-
-    Returns
-    -------
-    channel_relevance : np.ndarray
-        Mean class-wise normalized channel relevance.
-        Shape: (n_classes, n_channels).
+    The same CSP spatial patterns and LDA coefficients used in
+    the model-level channel relevance are retained, while the
+    contribution of each CSP component is additionally weighted
+    by its activation in each evaluation trial.
     """
-    if len(csps) != len(ldas):
-        raise ValueError(
-            "csps and ldas must contain the same "
-            "number of models."
-        )
+    data = np.asarray(
+        data,
+        dtype=np.float64,
+    )
 
-    if len(csps) == 0:
-        raise ValueError(
-            "At least one CSP+LDA model is required."
-        )
+    labels = np.asarray(
+        labels,
+        dtype=int,
+    )
 
     fold_relevances = []
+    fold_probabilities = []
 
     for csp, lda in zip(
         csps,
         ldas,
+        strict=True,
     ):
-        relevance = (
-            compute_fold_channel_relevance(
-                csp=csp,
-                lda=lda,
+        n_components = csp.n_components
+
+        # ------------------------------------------------------
+        # CSP spatial patterns
+        # Same computation as in your original analysis
+        # ------------------------------------------------------
+
+        patterns = np.asarray(
+            csp.patterns_[:n_components],
+            dtype=np.float64,
+        )
+
+        pattern_relevance = patterns**2
+
+        pattern_sums = np.sum(
+            pattern_relevance,
+            axis=1,
+            keepdims=True,
+        )
+
+        pattern_sums = np.maximum(
+            pattern_sums,
+            np.finfo(np.float64).eps,
+        )
+
+        pattern_relevance = (
+            pattern_relevance
+            / pattern_sums
+        )
+
+        # ------------------------------------------------------
+        # Trial CSP features
+        # ------------------------------------------------------
+
+        features = np.asarray(
+            csp.transform(data),
+            dtype=np.float64,
+        )
+
+        # ------------------------------------------------------
+        # LDA coefficients
+        # ------------------------------------------------------
+
+        coefficients = np.asarray(
+            lda.coef_,
+            dtype=np.float64,
+        )
+
+        if coefficients.ndim == 1:
+            coefficients = coefficients[
+                np.newaxis,
+                :
+            ]
+
+        classes = np.asarray(
+            lda.classes_
+        )
+
+        trial_relevance = np.zeros(
+            (
+                len(data),
+                data.shape[1],
+            ),
+            dtype=np.float64,
+        )
+
+        # ------------------------------------------------------
+        # Compute relevance for true class of each trial
+        # ------------------------------------------------------
+
+        for trial_index, label in enumerate(
+            labels
+        ):
+            class_index = np.flatnonzero(
+                classes == label
+            )[0]
+
+            component_relevance = np.abs(
+                features[trial_index]
+                * coefficients[class_index]
+            )
+
+            trial_relevance[
+                trial_index
+            ] = (
+                component_relevance
+                @ pattern_relevance
+            )
+
+        fold_relevances.append(
+            trial_relevance
+        )
+
+        fold_probabilities.append(
+            lda.predict_proba(
+                features
             )
         )
 
-        fold_relevances.append(
-            relevance
+    # ----------------------------------------------------------
+    # Average across folds
+    # ----------------------------------------------------------
+
+    mean_relevance = np.mean(
+        np.stack(
+            fold_relevances,
+            axis=0,
+        ),
+        axis=0,
+    )
+
+    mean_probabilities = np.mean(
+        np.stack(
+            fold_probabilities,
+            axis=0,
+        ),
+        axis=0,
+    )
+
+    classes = np.asarray(
+        ldas[0].classes_
+    )
+
+    predictions = classes[
+        np.argmax(
+            mean_probabilities,
+            axis=1,
+        )
+    ]
+
+    return TrialChannelRelevanceResult(
+        values=mean_relevance,
+        predictions=predictions,
+        labels=labels,
+    )
+
+
+def aggregate_trial_channel_relevance(
+    result: TrialChannelRelevanceResult,
+    mask: np.ndarray,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+]:
+    """
+    Average trial relevance separately for each true class.
+    """
+    classes = np.unique(
+        result.labels
+    )
+
+    n_channels = result.values.shape[1]
+
+    relevance = np.zeros(
+        (
+            len(classes),
+            n_channels,
+        ),
+        dtype=np.float64,
+    )
+
+    counts = np.zeros(
+        len(classes),
+        dtype=int,
+    )
+
+    for class_index, class_id in enumerate(
+        classes
+    ):
+        class_mask = (
+            (result.labels == class_id)
+            & mask
         )
 
-    fold_relevances = np.stack(
-        fold_relevances,
-        axis=0,
-    )
+        counts[class_index] = np.sum(
+            class_mask
+        )
 
-    # Shape before averaging:
-    # (n_folds, n_classes, n_channels)
-    channel_relevance = np.mean(
-        fold_relevances,
-        axis=0,
-    )
+        if counts[class_index] == 0:
+            relevance[class_index] = np.nan
+            continue
 
-    # Re-normalize each class after fold averaging.
-    class_sums = np.sum(
-        channel_relevance,
-        axis=1,
-        keepdims=True,
-    )
+        relevance[class_index] = np.mean(
+            result.values[class_mask],
+            axis=0,
+        )
 
-    class_sums = np.maximum(
-        class_sums,
-        np.finfo(np.float64).eps,
-    )
-
-    channel_relevance = (
-        channel_relevance
-        / class_sums
-    )
-
-    return channel_relevance
+    return relevance, counts

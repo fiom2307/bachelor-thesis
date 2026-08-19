@@ -42,9 +42,14 @@ def plot_temporal_relevance(
     subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
+    ymin: float = 0.0,
+    ymax: float | None = None,
 ) -> Figure:
     """
-    Plot temporal SHAP relevance averaged across EEG channels.
+    Plot class-wise temporal EEGNet SHAP relevance.
+
+    A shared ymin/ymax can be supplied so correct and incorrect
+    trial selections use exactly the same vertical scale.
     """
     class_ids = _get_class_ids(
         temporal_relevance
@@ -54,44 +59,120 @@ def plot_temporal_relevance(
         class_ids
     )
 
+    times = np.asarray(
+        times,
+        dtype=np.float64,
+    )
+
+    if times.ndim != 1:
+        raise ValueError(
+            "times must be one-dimensional."
+        )
+
+    # ----------------------------------------------------------
+    # Y-axis scale
+    # ----------------------------------------------------------
+
+    if ymax is None:
+        finite_values = []
+
+        for class_id in class_ids:
+            relevance = np.asarray(
+                temporal_relevance[
+                    class_id
+                ],
+                dtype=np.float64,
+            )
+
+            values = relevance[
+                np.isfinite(
+                    relevance
+                )
+            ]
+
+            if values.size > 0:
+                finite_values.append(
+                    values
+                )
+
+        if finite_values:
+            ymax = float(
+                np.max(
+                    np.concatenate(
+                        finite_values
+                    )
+                )
+            )
+        else:
+            ymax = float(
+                np.finfo(float).eps
+            )
+
+    ymax = max(
+        float(ymax),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+    if ymax <= ymin:
+        raise ValueError(
+            "ymax must be greater than ymin."
+        )
+
+    # ----------------------------------------------------------
+    # Figure
+    # ----------------------------------------------------------
+
     figure, axis = plt.subplots(
-        figsize=(11, 6),
+        figsize=(13, 7),
         constrained_layout=True,
     )
 
     for class_id in class_ids:
-        relevance = temporal_relevance[
-            class_id
-        ]
+        relevance = np.asarray(
+            temporal_relevance[
+                class_id
+            ],
+            dtype=np.float64,
+        )
 
         if relevance.shape != times.shape:
             raise ValueError(
-                "Each temporal relevance vector must "
+                "Each temporal relevance array must "
                 "have the same shape as times."
             )
 
         axis.plot(
             times,
             relevance,
-            linewidth=2,
             label=_get_class_title(
                 class_id,
                 trial_counts,
             ),
         )
 
-    _mark_imagery_window(
-        axis,
-        imagery_window,
+    # ----------------------------------------------------------
+    # Shared axis limits
+    # ----------------------------------------------------------
+
+    window_start, window_end = (
+        imagery_window
     )
 
-    axis.set_title(
-        _build_title(
-            base_title="EEGNet temporal SHAP relevance",
-            trial_selection=trial_selection,
-            subject=subject,
-        )
+    axis.set_xlim(
+        window_start,
+        window_end,
     )
+
+    axis.set_ylim(
+        ymin,
+        ymax,
+    )
+
+    # ----------------------------------------------------------
+    # Labels
+    # ----------------------------------------------------------
 
     axis.set_xlabel(
         "Time relative to cue (s)"
@@ -101,17 +182,22 @@ def plot_temporal_relevance(
         "Mean absolute SHAP value"
     )
 
-    axis.set_xlim(
-        times[0],
-        times[-1],
+    axis.set_title(
+        _build_title(
+            base_title=(
+                "EEGNet temporal SHAP relevance"
+            ),
+            trial_selection=trial_selection,
+            subject=subject,
+        )
+    )
+
+    axis.legend(
+        title="Motor-imagery class"
     )
 
     axis.grid(
         alpha=0.25,
-    )
-
-    axis.legend(
-        title="Motor-imagery class",
     )
 
     return figure

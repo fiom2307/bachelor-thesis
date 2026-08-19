@@ -165,8 +165,7 @@ def _load_subject_evaluation_data(
     np.ndarray,
 ]:
     """
-    Load the preprocessed evaluation epochs and labels
-    for one subject.
+    Load the preprocessed evaluation epochs and labels.
     """
     subject_data = get_data_for_subject(
         subject
@@ -233,33 +232,33 @@ def _create_times(
     )
 
 
-def _compute_shared_spatial_vmax(
+def _compute_shared_max(
     *relevance_arrays: np.ndarray,
 ) -> float:
     """
-    Compute one shared maximum across several
-    channel-relevance arrays.
+    Compute one shared maximum across relevance arrays.
 
     NaN values are ignored because a class can contain
     no selected trials for a particular subject.
     """
-    finite_values = [
-        np.asarray(
+    finite_values = []
+
+    for relevance in relevance_arrays:
+        relevance = np.asarray(
             relevance,
             dtype=np.float64,
-        )[
+        )
+
+        values = relevance[
             np.isfinite(
                 relevance
             )
         ]
-        for relevance in relevance_arrays
-    ]
 
-    finite_values = [
-        values
-        for values in finite_values
-        if values.size > 0
-    ]
+        if values.size > 0:
+            finite_values.append(
+                values
+            )
 
     if not finite_values:
         return float(
@@ -289,21 +288,14 @@ def _plot_spatial_relevance(
     vmax: float,
 ) -> None:
     """
-    Plot channel relevance, channel rankings, and
-    scalp topographies for one trial selection.
-
-    All spatial representations use the same numerical
-    relevance scale for correct/incorrect comparisons.
+    Plot channel relevance, rankings and topographies.
     """
     expected_shape = (
         len(CLASS_NAMES),
         len(CHANNEL_NAMES),
     )
 
-    if (
-        channel_relevance.shape
-        != expected_shape
-    ):
+    if channel_relevance.shape != expected_shape:
         raise ValueError(
             "Expected class-wise channel relevance "
             f"with shape {expected_shape}, "
@@ -402,27 +394,42 @@ def _plot_spatial_relevance(
 def _plot_temporal_relevance(
     temporal_relevance: np.ndarray,
     times: np.ndarray,
+    class_counts: np.ndarray,
     subject_name: str,
     selection: str,
     subject: int | None,
+    ymax: float,
 ) -> None:
     """
     Plot temporal relevance for one trial selection.
+
+    Correct and incorrect plots can use the same
+    vertical relevance scale.
     """
     expected_shape = (
         len(CLASS_NAMES),
         len(times),
     )
 
-    if (
-        temporal_relevance.shape
-        != expected_shape
-    ):
+    if temporal_relevance.shape != expected_shape:
         raise ValueError(
             "Expected class-wise temporal relevance "
             f"with shape {expected_shape}, "
             f"but received "
             f"{temporal_relevance.shape}."
+        )
+
+    class_counts = np.asarray(
+        class_counts,
+        dtype=int,
+    )
+
+    if class_counts.shape != (
+        len(CLASS_NAMES),
+    ):
+        raise ValueError(
+            "Expected one trial count for each "
+            "motor-imagery class."
         )
 
     temporal_relevance_path = (
@@ -441,6 +448,9 @@ def _plot_temporal_relevance(
         output_dir=(
             temporal_relevance_path.parent
         ),
+        class_counts=class_counts,
+        ymin=0.0,
+        ymax=ymax,
     )
 
 
@@ -459,10 +469,7 @@ def _plot_frequency_relevance(
         len(frequencies),
     )
 
-    if (
-        frequency_relevance.shape
-        != expected_shape
-    ):
+    if frequency_relevance.shape != expected_shape:
         raise ValueError(
             "Expected class-wise frequency relevance "
             f"with shape {expected_shape}, "
@@ -504,9 +511,6 @@ def plot_subject_analysis(
 ]:
     """
     Compute and plot CSP+LDA relevance for one subject.
-
-    Correct and incorrect spatial plots use the same
-    numerical scale.
     """
     subject_name = get_subject_name(
         subject
@@ -518,16 +522,12 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
-    # LOAD CSP+LDA MODELS
+    # LOAD MODELS AND DATA
     # ==========================================================
 
     csps, ldas = _load_subject_models(
         subject
     )
-
-    # ==========================================================
-    # LOAD EVALUATION DATA
-    # ==========================================================
 
     X_eval, y_eval = (
         _load_subject_evaluation_data(
@@ -540,7 +540,7 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
-    # TRIAL-WISE SPATIAL RELEVANCE
+    # SPATIAL RELEVANCE
     # ==========================================================
 
     trial_channel_result = (
@@ -578,25 +578,15 @@ def plot_subject_analysis(
         f"{incorrect_counts}"
     )
 
-    # ==========================================================
-    # SHARED SPATIAL SCALE
-    # ==========================================================
-
-    spatial_vmax = (
-        _compute_shared_spatial_vmax(
-            correct_channel_relevance,
-            incorrect_channel_relevance,
-        )
+    spatial_vmax = _compute_shared_max(
+        correct_channel_relevance,
+        incorrect_channel_relevance,
     )
 
     print(
         f"{subject_name} shared spatial vmax: "
         f"{spatial_vmax:.6f}"
     )
-
-    # ==========================================================
-    # CORRECT SPATIAL RELEVANCE
-    # ==========================================================
 
     _plot_spatial_relevance(
         channel_relevance=(
@@ -608,10 +598,6 @@ def plot_subject_analysis(
         subject=subject,
         vmax=spatial_vmax,
     )
-
-    # ==========================================================
-    # INCORRECT SPATIAL RELEVANCE
-    # ==========================================================
 
     _plot_spatial_relevance(
         channel_relevance=(
@@ -625,7 +611,7 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
-    # TRIAL-WISE TEMPORAL RELEVANCE
+    # TEMPORAL RELEVANCE
     # ==========================================================
 
     trial_temporal_result = (
@@ -671,14 +657,30 @@ def plot_subject_analysis(
             "spatial and temporal relevance."
         )
 
+    # ==========================================================
+    # SHARED TEMPORAL Y-AXIS
+    # ==========================================================
+
+    temporal_ymax = _compute_shared_max(
+        correct_temporal_relevance,
+        incorrect_temporal_relevance,
+    )
+
+    print(
+        f"{subject_name} shared temporal ymax: "
+        f"{temporal_ymax:.6f}"
+    )
+
     _plot_temporal_relevance(
         temporal_relevance=(
             correct_temporal_relevance
         ),
         times=times,
+        class_counts=correct_counts,
         subject_name=subject_name,
         selection="correct",
         subject=subject,
+        ymax=temporal_ymax,
     )
 
     _plot_temporal_relevance(
@@ -686,13 +688,15 @@ def plot_subject_analysis(
             incorrect_temporal_relevance
         ),
         times=times,
+        class_counts=incorrect_counts,
         subject_name=subject_name,
         selection="incorrect",
         subject=subject,
+        ymax=temporal_ymax,
     )
 
     # ==========================================================
-    # TRIAL-WISE FREQUENCY RELEVANCE
+    # FREQUENCY RELEVANCE
     # ==========================================================
 
     trial_frequency_result = (
@@ -809,30 +813,11 @@ def plot_global_analysis(
 ) -> None:
     """
     Plot mean CSP+LDA relevance across all subjects.
-
-    Global correct and incorrect spatial plots use
-    exactly the same numerical scale.
     """
 
     # ==========================================================
-    # GLOBAL SPATIAL RELEVANCE
+    # GLOBAL COUNTS
     # ==========================================================
-
-    mean_correct_channel_relevance = np.nanmean(
-        np.stack(
-            subject_correct_channel_relevances,
-            axis=0,
-        ),
-        axis=0,
-    )
-
-    mean_incorrect_channel_relevance = np.nanmean(
-        np.stack(
-            subject_incorrect_channel_relevances,
-            axis=0,
-        ),
-        axis=0,
-    )
 
     total_correct_counts = np.sum(
         np.stack(
@@ -854,11 +839,29 @@ def plot_global_analysis(
         int
     )
 
-    global_spatial_vmax = (
-        _compute_shared_spatial_vmax(
-            mean_correct_channel_relevance,
-            mean_incorrect_channel_relevance,
-        )
+    # ==========================================================
+    # GLOBAL SPATIAL RELEVANCE
+    # ==========================================================
+
+    mean_correct_channel_relevance = np.nanmean(
+        np.stack(
+            subject_correct_channel_relevances,
+            axis=0,
+        ),
+        axis=0,
+    )
+
+    mean_incorrect_channel_relevance = np.nanmean(
+        np.stack(
+            subject_incorrect_channel_relevances,
+            axis=0,
+        ),
+        axis=0,
+    )
+
+    global_spatial_vmax = _compute_shared_max(
+        mean_correct_channel_relevance,
+        mean_incorrect_channel_relevance,
     )
 
     print(
@@ -889,7 +892,7 @@ def plot_global_analysis(
     )
 
     # ==========================================================
-    # TEMPORAL
+    # GLOBAL TEMPORAL RELEVANCE
     # ==========================================================
 
     correct_temporal_shapes = {
@@ -936,14 +939,30 @@ def plot_global_analysis(
         mean_correct_temporal_relevance.shape[1]
     )
 
+    # ==========================================================
+    # GLOBAL SHARED TEMPORAL Y-AXIS
+    # ==========================================================
+
+    global_temporal_ymax = _compute_shared_max(
+        mean_correct_temporal_relevance,
+        mean_incorrect_temporal_relevance,
+    )
+
+    print(
+        "Global correct/incorrect shared temporal "
+        f"ymax: {global_temporal_ymax:.6f}"
+    )
+
     _plot_temporal_relevance(
         temporal_relevance=(
             mean_correct_temporal_relevance
         ),
         times=times,
+        class_counts=total_correct_counts,
         subject_name="all_mean",
         selection="correct",
         subject=None,
+        ymax=global_temporal_ymax,
     )
 
     _plot_temporal_relevance(
@@ -951,13 +970,15 @@ def plot_global_analysis(
             mean_incorrect_temporal_relevance
         ),
         times=times,
+        class_counts=total_incorrect_counts,
         subject_name="all_mean",
         selection="incorrect",
         subject=None,
+        ymax=global_temporal_ymax,
     )
 
     # ==========================================================
-    # FREQUENCY
+    # GLOBAL FREQUENCY RELEVANCE
     # ==========================================================
 
     reference_frequencies = (
@@ -1036,8 +1057,7 @@ def plot_global_analysis(
 
 def main() -> None:
     """
-    Generate subject-wise and global
-    CSP pattern analysis plots.
+    Generate subject-wise and global CSP+LDA analysis plots.
     """
     subject_correct_channel_relevances = []
     subject_incorrect_channel_relevances = []

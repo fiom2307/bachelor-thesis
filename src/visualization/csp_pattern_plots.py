@@ -526,10 +526,16 @@ def plot_csp_temporal_relevance(
     times: np.ndarray,
     class_names: list[str],
     subject: str,
-    output_dir: Path,
+    output_dir,
+    class_counts: np.ndarray | None = None,
+    ymin: float = 0.0,
+    ymax: float | None = None,
 ) -> None:
     """
     Plot class-wise CSP+LDA temporal relevance.
+
+    A shared ymin/ymax can be supplied so correct and incorrect
+    trial selections use exactly the same vertical scale.
     """
     temporal_relevance = np.asarray(
         temporal_relevance,
@@ -541,81 +547,193 @@ def plot_csp_temporal_relevance(
         dtype=np.float64,
     )
 
-    if temporal_relevance.ndim != 2:
+    expected_shape = (
+        len(class_names),
+        len(times),
+    )
+
+    if temporal_relevance.shape != expected_shape:
         raise ValueError(
             "temporal_relevance must have shape "
-            "(n_classes, n_times)."
+            f"{expected_shape}."
         )
 
-    if temporal_relevance.shape[0] != len(
-        class_names
-    ):
+    if times.ndim != 1:
         raise ValueError(
-            "Number of classes in temporal_relevance "
-            "does not match class_names."
+            "times must be one-dimensional."
         )
 
-    if temporal_relevance.shape[1] != len(
-        times
-    ):
-        raise ValueError(
-            "Number of time points in temporal_relevance "
-            "does not match times."
+    if class_counts is not None:
+        class_counts = np.asarray(
+            class_counts,
+            dtype=int,
         )
+
+        if class_counts.shape != (
+            len(class_names),
+        ):
+            raise ValueError(
+                "class_counts must contain one "
+                "value per class."
+            )
 
     output_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    fig, axes = plt.subplots(
-        2,
-        2,
-        figsize=(14, 8),
-        sharex=True,
-        sharey=True,
+    # ----------------------------------------------------------
+    # Shared Y-axis scale
+    # ----------------------------------------------------------
+
+    if ymax is None:
+        finite_values = temporal_relevance[
+            np.isfinite(
+                temporal_relevance
+            )
+        ]
+
+        if finite_values.size == 0:
+            ymax = float(
+                np.finfo(float).eps
+            )
+        else:
+            ymax = float(
+                np.max(
+                    finite_values
+                )
+            )
+
+    ymax = max(
+        float(ymax),
+        float(
+            np.finfo(float).eps
+        ),
     )
 
-    axes = axes.flatten()
+    if ymax <= ymin:
+        raise ValueError(
+            "ymax must be greater than ymin."
+        )
+
+    # ----------------------------------------------------------
+    # Figure
+    # ----------------------------------------------------------
+
+    fig, ax = plt.subplots(
+        figsize=(13, 7),
+        constrained_layout=True,
+    )
 
     for class_idx, class_name in enumerate(
         class_names
     ):
-        ax = axes[class_idx]
+        relevance = temporal_relevance[
+            class_idx
+        ]
+
+        # Skip a completely unavailable class.
+        if not np.any(
+            np.isfinite(
+                relevance
+            )
+        ):
+            continue
+
+        if class_counts is None:
+            label = class_name
+        else:
+            label = (
+                f"{class_name} "
+                f"(n={class_counts[class_idx]})"
+            )
 
         ax.plot(
             times,
-            temporal_relevance[class_idx],
+            relevance,
+            label=label,
         )
 
-        ax.set_title(
-            class_name
+    # ----------------------------------------------------------
+    # Axis limits
+    # ----------------------------------------------------------
+
+    ax.set_xlim(
+        times[0],
+        times[-1],
+    )
+
+    ax.set_ylim(
+        ymin,
+        ymax,
+    )
+
+    # ----------------------------------------------------------
+    # Labels
+    # ----------------------------------------------------------
+
+    ax.set_xlabel(
+        "Time relative to cue (s)"
+    )
+
+    ax.set_ylabel(
+        "Normalized temporal relevance"
+    )
+
+    # ----------------------------------------------------------
+    # Title formatting, same style as SHAP
+    # ----------------------------------------------------------
+
+    if subject == "all_mean_correct":
+        title_suffix = (
+            "correct trials, mean across subjects"
         )
 
-        ax.set_xlabel(
-            "Time relative to cue (s)"
+    elif subject == "all_mean_incorrect":
+        title_suffix = (
+            "incorrect trials, mean across subjects"
         )
 
-        ax.set_ylabel(
-            "Normalized temporal relevance"
+    elif subject.endswith(
+        "_correct"
+    ):
+        title_suffix = (
+            "correct trials, "
+            f"{subject.removesuffix('_correct')}"
         )
 
-        ax.grid(
-            alpha=0.25,
+    elif subject.endswith(
+        "_incorrect"
+    ):
+        title_suffix = (
+            "incorrect trials, "
+            f"{subject.removesuffix('_incorrect')}"
         )
 
-    if subject == "all_mean":
-        title_suffix = "mean across subjects"
     else:
         title_suffix = subject
 
-    fig.suptitle(
+    ax.set_title(
         "CSP+LDA temporal relevance\n"
-        f"({title_suffix})",
-        fontsize=16,
+        f"({title_suffix})"
     )
 
-    fig.tight_layout()
+    # ----------------------------------------------------------
+    # Legend + grid
+    # ----------------------------------------------------------
+
+    ax.legend(
+        title="Motor-imagery class",
+        loc="upper right",
+    )
+
+    ax.grid(
+        alpha=0.25,
+    )
+
+    # ----------------------------------------------------------
+    # Save
+    # ----------------------------------------------------------
 
     output_path = (
         output_dir
@@ -628,7 +746,9 @@ def plot_csp_temporal_relevance(
         bbox_inches="tight",
     )
 
-    plt.close(fig)
+    plt.close(
+        fig
+    )
 
 
 def plot_csp_frequency_relevance(

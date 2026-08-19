@@ -100,12 +100,8 @@ def plot_shap_for_subject(
     """
     Compute and save EEGNet SHAP plots for one subject.
 
-    Correct and incorrect spatial plots use shared scales
-    within each subject.
-
-    Returns time-domain class relevance, frequency-domain relevance,
-    and trial counts for each trial selection so they can later be
-    aggregated into global mean plots.
+    Correct and incorrect plots use shared scales
+    within each subject where appropriate.
     """
     data = get_data_for_subject(
         subject
@@ -247,10 +243,7 @@ def plot_shap_for_subject(
         )
 
     # ------------------------------------------------------------------
-    # Relevance analyses
-    #
-    # Compute correct and incorrect first so comparable plots can
-    # share exactly the same scale.
+    # Compute relevance first for BOTH trial selections
     # ------------------------------------------------------------------
 
     subject_results: dict[
@@ -368,12 +361,18 @@ def plot_shap_for_subject(
         ] = topographic_relevance
 
     # ------------------------------------------------------------------
-    # Shared spatial scales for correct + incorrect
+    # Shared scales: correct + incorrect
     # ------------------------------------------------------------------
 
     channel_vmax = (
         _compute_shared_relevance_max(
             channel_relevances
+        )
+    )
+
+    temporal_ymax = (
+        _compute_shared_relevance_max(
+            temporal_relevances
         )
     )
 
@@ -387,6 +386,12 @@ def plot_shap_for_subject(
         f"A{subject:02d}: "
         f"shared channel vmax="
         f"{channel_vmax:.8f}"
+    )
+
+    print(
+        f"A{subject:02d}: "
+        f"shared temporal ymax="
+        f"{temporal_ymax:.8f}"
     )
 
     print(
@@ -466,6 +471,8 @@ def plot_shap_for_subject(
                 subject=subject,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=trial_counts,
+                ymin=0.0,
+                ymax=temporal_ymax,
             )
         )
 
@@ -600,10 +607,9 @@ def plot_mean_shap(
     """
     Compute and save global mean SHAP plots across subjects.
 
-    Correct and incorrect mean spatial plots use exactly
-    the same scales.
+    Correct and incorrect plots use the same scales
+    where appropriate.
     """
-
     mean_class_relevances: dict[
         TrialSelection,
         ClassRelevance,
@@ -637,7 +643,7 @@ def plot_mean_shap(
     ] = {}
 
     # ------------------------------------------------------------------
-    # First compute BOTH correct and incorrect mean relevance.
+    # Compute BOTH correct and incorrect first
     # ------------------------------------------------------------------
 
     for trial_selection in TRIAL_SELECTIONS:
@@ -734,12 +740,18 @@ def plot_mean_shap(
         ] = topographic_relevance
 
     # ------------------------------------------------------------------
-    # Shared scales for correct + incorrect mean plots
+    # Shared scales for correct + incorrect global mean plots
     # ------------------------------------------------------------------
 
     channel_vmax = (
         _compute_shared_relevance_max(
             channel_relevances
+        )
+    )
+
+    temporal_ymax = (
+        _compute_shared_relevance_max(
+            temporal_relevances
         )
     )
 
@@ -752,6 +764,11 @@ def plot_mean_shap(
     print(
         "Mean correct/incorrect shared "
         f"channel vmax={channel_vmax:.8f}"
+    )
+
+    print(
+        "Mean correct/incorrect shared "
+        f"temporal ymax={temporal_ymax:.8f}"
     )
 
     print(
@@ -837,6 +854,8 @@ def plot_mean_shap(
                 subject=None,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=mean_trial_counts,
+                ymin=0.0,
+                ymax=temporal_ymax,
             )
         )
 
@@ -942,9 +961,6 @@ def _compute_shared_relevance_max(
     """
     Compute one maximum relevance value across all available
     trial selections and motor-imagery classes.
-
-    This allows correct and incorrect spatial plots to use
-    the same numerical scale.
     """
     maxima = []
 
@@ -1061,9 +1077,6 @@ def _mean_class_relevance(
 ) -> dict[int, np.ndarray]:
     """
     Compute class-wise mean relevance across subjects.
-
-    If a class is missing for some subjects, average only across
-    subjects where that class is available.
     """
     mean_relevance = {}
 

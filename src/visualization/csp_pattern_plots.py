@@ -12,43 +12,109 @@ def plot_csp_channel_relevance(
     channel_names: list[str],
     class_names: list[str],
     subject: str,
-    output_dir: Path,
+    output_dir,
+    class_counts: np.ndarray | None = None,
+    vmin: float = 0.0,
+    vmax: float | None = None,
 ) -> None:
     """
-    Plot class-wise CSP+LDA channel relevance.
+    Plot class-wise CSP+LDA channel relevance as a heatmap.
+
+    A shared vmin/vmax can be supplied so correct and incorrect
+    trial selections use the same color scale.
     """
     channel_relevance = np.asarray(
         channel_relevance,
         dtype=np.float64,
     )
 
-    if channel_relevance.shape != (
+    expected_shape = (
         len(class_names),
         len(channel_names),
-    ):
+    )
+
+    if channel_relevance.shape != expected_shape:
         raise ValueError(
             "channel_relevance must have shape "
-            "(n_classes, n_channels)."
+            f"{expected_shape}."
         )
+
+    if class_counts is not None:
+        class_counts = np.asarray(
+            class_counts,
+            dtype=int,
+        )
+
+        if class_counts.shape != (
+            len(class_names),
+        ):
+            raise ValueError(
+                "class_counts must contain one "
+                "value per class."
+            )
 
     output_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
+    # ----------------------------------------------------------
+    # Color scale
+    # ----------------------------------------------------------
+
+    if vmax is None:
+        finite_values = channel_relevance[
+            np.isfinite(
+                channel_relevance
+            )
+        ]
+
+        if finite_values.size == 0:
+            vmax = float(
+                np.finfo(float).eps
+            )
+        else:
+            vmax = float(
+                np.max(
+                    finite_values
+                )
+            )
+
+    vmax = max(
+        float(vmax),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+    # ----------------------------------------------------------
+    # Plot
+    # ----------------------------------------------------------
+
     fig, ax = plt.subplots(
-        figsize=(14, 5),
+        figsize=(15, 5),
+        constrained_layout=True,
+    )
+
+    masked_relevance = np.ma.masked_invalid(
+        channel_relevance
     )
 
     image = ax.imshow(
-        channel_relevance,
+        masked_relevance,
         aspect="auto",
         interpolation="nearest",
+        cmap="viridis",
+        vmin=vmin,
+        vmax=vmax,
     )
 
     ax.set_xticks(
-        np.arange(len(channel_names)),
+        np.arange(
+            len(channel_names)
+        )
     )
+
     ax.set_xticklabels(
         channel_names,
         rotation=45,
@@ -56,31 +122,89 @@ def plot_csp_channel_relevance(
     )
 
     ax.set_yticks(
-        np.arange(len(class_names)),
-    )
-    ax.set_yticklabels(
-        class_names,
+        np.arange(
+            len(class_names)
+        )
     )
 
-    ax.set_xlabel("EEG channel")
-    ax.set_ylabel("Motor-imagery class")
+    if class_counts is None:
+        y_labels = class_names
+    else:
+        y_labels = [
+            f"{class_name} "
+            f"(n={class_counts[class_idx]})"
+            for class_idx, class_name
+            in enumerate(class_names)
+        ]
+
+    ax.set_yticklabels(
+        y_labels
+    )
+
+    ax.set_xlabel(
+        "EEG channel"
+    )
+
+    ax.set_ylabel(
+        "Motor-imagery class"
+    )
+
+    # ----------------------------------------------------------
+    # Title
+    # ----------------------------------------------------------
+
+    if subject == "all_mean_correct":
+        title_suffix = (
+            "correct trials, mean across subjects"
+        )
+
+    elif subject == "all_mean_incorrect":
+        title_suffix = (
+            "incorrect trials, mean across subjects"
+        )
+
+    elif subject.endswith(
+        "_correct"
+    ):
+        title_suffix = (
+            "correct trials, "
+            f"{subject.removesuffix('_correct')}"
+        )
+
+    elif subject.endswith(
+        "_incorrect"
+    ):
+        title_suffix = (
+            "incorrect trials, "
+            f"{subject.removesuffix('_incorrect')}"
+        )
+
+    else:
+        title_suffix = subject
 
     ax.set_title(
-        "Class-wise CSP+LDA channel relevance\n"
-        f"({subject})"
+        "CSP+LDA channel relevance\n"
+        f"({title_suffix})",
+        fontsize=15,
     )
+
+    # ----------------------------------------------------------
+    # Colorbar
+    # ----------------------------------------------------------
 
     colorbar = fig.colorbar(
         image,
         ax=ax,
-        pad=0.04,
+        shrink=0.9,
     )
 
     colorbar.set_label(
         "Normalized channel relevance"
     )
 
-    fig.tight_layout()
+    # ----------------------------------------------------------
+    # Save
+    # ----------------------------------------------------------
 
     output_path = (
         output_dir
@@ -93,7 +217,9 @@ def plot_csp_channel_relevance(
         bbox_inches="tight",
     )
 
-    plt.close(fig)
+    plt.close(
+        fig
+    )
 
 
 def plot_csp_channel_rankings(
@@ -101,73 +227,225 @@ def plot_csp_channel_rankings(
     channel_names: list[str],
     class_names: list[str],
     subject: str,
-    output_dir: Path,
+    output_dir,
     top_n: int = 10,
+    class_counts: np.ndarray | None = None,
+    xmax: float | None = None,
 ) -> None:
     """
-    Plot the most relevant EEG channels for each motor-imagery class.
+    Plot the highest-ranked CSP+LDA channels for each class.
+
+    A shared xmax can be supplied so correct and incorrect
+    ranking figures use the same relevance scale.
     """
     channel_relevance = np.asarray(
         channel_relevance,
         dtype=np.float64,
     )
 
-    if channel_relevance.shape != (
+    expected_shape = (
         len(class_names),
         len(channel_names),
-    ):
+    )
+
+    if channel_relevance.shape != expected_shape:
         raise ValueError(
             "channel_relevance must have shape "
-            "(n_classes, n_channels)."
+            f"{expected_shape}."
         )
+
+    if top_n <= 0:
+        raise ValueError(
+            "top_n must be greater than zero."
+        )
+
+    if class_counts is not None:
+        class_counts = np.asarray(
+            class_counts,
+            dtype=int,
+        )
+
+        if class_counts.shape != (
+            len(class_names),
+        ):
+            raise ValueError(
+                "class_counts must contain one "
+                "value per class."
+            )
 
     output_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    n_classes = len(class_names)
+    # ----------------------------------------------------------
+    # Shared x-axis scale
+    # ----------------------------------------------------------
+
+    if xmax is None:
+        finite_values = channel_relevance[
+            np.isfinite(
+                channel_relevance
+            )
+        ]
+
+        if finite_values.size == 0:
+            xmax = float(
+                np.finfo(float).eps
+            )
+        else:
+            xmax = float(
+                np.max(
+                    finite_values
+                )
+            )
+
+    xmax = max(
+        float(xmax),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+    # ----------------------------------------------------------
+    # Figure
+    # ----------------------------------------------------------
 
     fig, axes = plt.subplots(
         2,
         2,
-        figsize=(14, 10),
+        figsize=(13, 10),
+        constrained_layout=True,
     )
 
     axes = axes.flatten()
 
-    for class_idx in range(n_classes):
-        ax = axes[class_idx]
+    for class_idx, class_name in enumerate(
+        class_names
+    ):
+        ax = axes[
+            class_idx
+        ]
 
         relevance = channel_relevance[
             class_idx
         ]
 
-        ranking = np.argsort(
-            relevance
-        )[::-1][:top_n]
-
-        ranked_channels = [
-            channel_names[index]
-            for index in ranking
-        ]
-
-        ranked_relevance = relevance[
-            ranking
-        ]
-
-        # Reverse so that the most relevant
-        # channel appears at the top.
-        ranked_channels = ranked_channels[::-1]
-        ranked_relevance = ranked_relevance[::-1]
-
-        ax.barh(
-            ranked_channels,
-            ranked_relevance,
+        count = (
+            None
+            if class_counts is None
+            else int(
+                class_counts[
+                    class_idx
+                ]
+            )
         )
 
+        # ------------------------------------------------------
+        # Title
+        # ------------------------------------------------------
+
+        if count is None:
+            class_title = class_name
+        else:
+            class_title = (
+                f"{class_name} "
+                f"(n={count})"
+            )
+
         ax.set_title(
-            class_names[class_idx]
+            class_title
+        )
+
+        ax.set_xlim(
+            0.0,
+            xmax,
+        )
+
+        # ------------------------------------------------------
+        # No selected trials
+        # ------------------------------------------------------
+
+        finite_mask = np.isfinite(
+            relevance
+        )
+
+        if (
+            count == 0
+            or not np.any(
+                finite_mask
+            )
+        ):
+            ax.text(
+                0.5,
+                0.5,
+                "No trials",
+                horizontalalignment="center",
+                verticalalignment="center",
+                transform=ax.transAxes,
+            )
+
+            ax.set_xlabel(
+                "Normalized channel relevance"
+            )
+
+            ax.set_yticks([])
+
+            continue
+
+        # ------------------------------------------------------
+        # Ranking
+        # ------------------------------------------------------
+
+        valid_indices = np.where(
+            finite_mask
+        )[0]
+
+        valid_relevance = relevance[
+            finite_mask
+        ]
+
+        ranking_order = np.argsort(
+            valid_relevance
+        )[::-1]
+
+        ranking_order = ranking_order[
+            :top_n
+        ]
+
+        ranked_indices = valid_indices[
+            ranking_order
+        ]
+
+        ranked_values = relevance[
+            ranked_indices
+        ]
+
+        ranked_names = [
+            channel_names[
+                channel_idx
+            ]
+            for channel_idx
+            in ranked_indices
+        ]
+
+        # Reverse so highest channel appears at the top.
+        ranked_names = (
+            ranked_names[::-1]
+        )
+
+        ranked_values = (
+            ranked_values[::-1]
+        )
+
+        ax.barh(
+            ranked_names,
+            ranked_values,
+        )
+
+        ax.set_xlim(
+            0.0,
+            xmax,
         )
 
         ax.set_xlabel(
@@ -183,13 +461,49 @@ def plot_csp_channel_rankings(
             alpha=0.25,
         )
 
+    # ----------------------------------------------------------
+    # Main title
+    # ----------------------------------------------------------
+
+    if subject == "all_mean_correct":
+        title_suffix = (
+            "correct trials, mean across subjects"
+        )
+
+    elif subject == "all_mean_incorrect":
+        title_suffix = (
+            "incorrect trials, mean across subjects"
+        )
+
+    elif subject.endswith(
+        "_correct"
+    ):
+        title_suffix = (
+            "correct trials, "
+            f"{subject.removesuffix('_correct')}"
+        )
+
+    elif subject.endswith(
+        "_incorrect"
+    ):
+        title_suffix = (
+            "incorrect trials, "
+            f"{subject.removesuffix('_incorrect')}"
+        )
+
+    else:
+        title_suffix = subject
+
     fig.suptitle(
-        "Top 10 EEG channels by CSP+LDA relevance\n"
-        f"({subject})",
-        fontsize=16,
+        f"Top {top_n} EEG channels "
+        "by CSP+LDA relevance\n"
+        f"({title_suffix})",
+        fontsize=15,
     )
 
-    fig.tight_layout()
+    # ----------------------------------------------------------
+    # Save
+    # ----------------------------------------------------------
 
     output_path = (
         output_dir
@@ -202,7 +516,9 @@ def plot_csp_channel_rankings(
         bbox_inches="tight",
     )
 
-    plt.close(fig)
+    plt.close(
+        fig
+    )
 
 
 def plot_csp_temporal_relevance(

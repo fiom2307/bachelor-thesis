@@ -100,7 +100,7 @@ def plot_shap_for_subject(
     """
     Compute and save EEGNet SHAP plots for one subject.
 
-    Correct and incorrect topographies use the same color scale
+    Correct and incorrect spatial plots use shared scales
     within each subject.
 
     Returns time-domain class relevance, frequency-domain relevance,
@@ -249,9 +249,8 @@ def plot_shap_for_subject(
     # ------------------------------------------------------------------
     # Relevance analyses
     #
-    # First compute BOTH correct and incorrect relevance.
-    # Plotting is done afterwards so the two topography figures can
-    # share exactly the same color scale.
+    # Compute correct and incorrect first so comparable plots can
+    # share exactly the same scale.
     # ------------------------------------------------------------------
 
     subject_results: dict[
@@ -369,13 +368,25 @@ def plot_shap_for_subject(
         ] = topographic_relevance
 
     # ------------------------------------------------------------------
-    # Shared topography scale for correct + incorrect
+    # Shared spatial scales for correct + incorrect
     # ------------------------------------------------------------------
 
+    channel_vmax = (
+        _compute_shared_relevance_max(
+            channel_relevances
+        )
+    )
+
     topography_vmax = (
-        _compute_shared_topography_max(
+        _compute_shared_relevance_max(
             topographic_relevances
         )
+    )
+
+    print(
+        f"A{subject:02d}: "
+        f"shared channel vmax="
+        f"{channel_vmax:.8f}"
     )
 
     print(
@@ -431,6 +442,8 @@ def plot_shap_for_subject(
                 trial_selection=trial_selection,
                 subject=subject,
                 trial_counts=trial_counts,
+                vmin=0.0,
+                vmax=channel_vmax,
             )
         )
 
@@ -441,6 +454,7 @@ def plot_shap_for_subject(
                 subject=subject,
                 top_n=10,
                 trial_counts=trial_counts,
+                xmax=channel_vmax,
             )
         )
 
@@ -586,8 +600,8 @@ def plot_mean_shap(
     """
     Compute and save global mean SHAP plots across subjects.
 
-    Correct and incorrect mean topographies use exactly the same
-    color scale.
+    Correct and incorrect mean spatial plots use exactly
+    the same scales.
     """
 
     mean_class_relevances: dict[
@@ -720,15 +734,24 @@ def plot_mean_shap(
         ] = topographic_relevance
 
     # ------------------------------------------------------------------
-    # One shared color scale for the two mean figures.
-    #
-    # This is the important part for your thesis comparison.
+    # Shared scales for correct + incorrect mean plots
     # ------------------------------------------------------------------
 
+    channel_vmax = (
+        _compute_shared_relevance_max(
+            channel_relevances
+        )
+    )
+
     topography_vmax = (
-        _compute_shared_topography_max(
+        _compute_shared_relevance_max(
             topographic_relevances
         )
+    )
+
+    print(
+        "Mean correct/incorrect shared "
+        f"channel vmax={channel_vmax:.8f}"
     )
 
     print(
@@ -790,6 +813,8 @@ def plot_mean_shap(
                 trial_selection=trial_selection,
                 subject=None,
                 trial_counts=mean_trial_counts,
+                vmin=0.0,
+                vmax=channel_vmax,
             )
         )
 
@@ -800,6 +825,7 @@ def plot_mean_shap(
                 subject=None,
                 top_n=10,
                 trial_counts=mean_trial_counts,
+                xmax=channel_vmax,
             )
         )
 
@@ -907,8 +933,8 @@ def plot_mean_shap(
         )
 
 
-def _compute_shared_topography_max(
-    topographic_relevances: Mapping[
+def _compute_shared_relevance_max(
+    relevances: Mapping[
         TrialSelection,
         VectorRelevance,
     ],
@@ -917,20 +943,34 @@ def _compute_shared_topography_max(
     Compute one maximum relevance value across all available
     trial selections and motor-imagery classes.
 
-    This allows correct and incorrect topographies to use the
-    same color scale.
+    This allows correct and incorrect spatial plots to use
+    the same numerical scale.
     """
-    maxima = [
-        float(
-            np.max(
-                class_relevance
+    maxima = []
+
+    for selection_relevance in relevances.values():
+        for class_relevance in selection_relevance.values():
+            class_relevance = np.asarray(
+                class_relevance,
+                dtype=np.float64,
             )
-        )
-        for selection_relevance
-        in topographic_relevances.values()
-        for class_relevance
-        in selection_relevance.values()
-    ]
+
+            finite_values = class_relevance[
+                np.isfinite(
+                    class_relevance
+                )
+            ]
+
+            if finite_values.size == 0:
+                continue
+
+            maxima.append(
+                float(
+                    np.max(
+                        finite_values
+                    )
+                )
+            )
 
     if not maxima:
         return float(

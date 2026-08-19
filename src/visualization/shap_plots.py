@@ -347,9 +347,14 @@ def plot_channel_relevance(
     trial_selection: TrialSelection,
     subject: int | None,
     trial_counts: TrialCounts | None = None,
+    vmin: float = 0.0,
+    vmax: float | None = None,
 ) -> Figure:
     """
     Plot a class-by-channel SHAP relevance heatmap.
+
+    A shared vmin/vmax can be supplied so correct and incorrect
+    trial selections use the same color scale.
     """
     class_ids = _get_class_ids(
         channel_relevance
@@ -374,18 +379,36 @@ def plot_channel_relevance(
             "match the number of channel names."
         )
 
+    # ----------------------------------------------------------
+    # Color scale
+    # ----------------------------------------------------------
+
+    if vmax is None:
+        vmax = float(
+            np.nanmax(
+                relevance_matrix
+            )
+        )
+
+    vmax = max(
+        float(vmax),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+    if vmax <= vmin:
+        raise ValueError(
+            "vmax must be greater than vmin."
+        )
+
+    # ----------------------------------------------------------
+    # Figure
+    # ----------------------------------------------------------
+
     figure, axis = plt.subplots(
         figsize=(15, 5),
         constrained_layout=True,
-    )
-
-    maximum_relevance = max(
-        float(
-            np.max(
-                relevance_matrix
-            )
-        ),
-        np.finfo(float).eps,
     )
 
     image = axis.imshow(
@@ -393,8 +416,8 @@ def plot_channel_relevance(
         aspect="auto",
         interpolation="nearest",
         cmap="viridis",
-        vmin=0.0,
-        vmax=maximum_relevance,
+        vmin=vmin,
+        vmax=vmax,
     )
 
     axis.set_xticks(
@@ -460,9 +483,13 @@ def plot_channel_rankings(
     subject: int | None,
     top_n: int = 10,
     trial_counts: TrialCounts | None = None,
+    xmax: float | None = None,
 ) -> Figure:
     """
-    Plot the highest-ranked EEG channels by SHAP relevance.
+    Plot the highest-ranked EEG channels for each class.
+
+    A shared xmax can be supplied so correct and incorrect
+    ranking plots use the same horizontal relevance scale.
     """
     if top_n <= 0:
         raise ValueError(
@@ -478,6 +505,43 @@ def plot_channel_rankings(
     _validate_class_relevance(
         class_ids
     )
+
+    # ----------------------------------------------------------
+    # Shared x-axis scale
+    # ----------------------------------------------------------
+
+    if xmax is None:
+        relevance_values = [
+            float(relevance)
+            for class_id in class_ids
+            for _, relevance
+            in channel_rankings[
+                class_id
+            ][:top_n]
+        ]
+
+        if relevance_values:
+            xmax = max(
+                max(relevance_values),
+                float(
+                    np.finfo(float).eps
+                ),
+            )
+        else:
+            xmax = float(
+                np.finfo(float).eps
+            )
+
+    xmax = max(
+        float(xmax),
+        float(
+            np.finfo(float).eps
+        ),
+    )
+
+    # ----------------------------------------------------------
+    # Figure
+    # ----------------------------------------------------------
 
     figure, axes = plt.subplots(
         nrows=2,
@@ -516,6 +580,16 @@ def plot_channel_rankings(
 
         axis.invert_yaxis()
 
+        # ------------------------------------------------------
+        # Same numerical scale for every class and for
+        # correct/incorrect figures.
+        # ------------------------------------------------------
+
+        axis.set_xlim(
+            0.0,
+            xmax,
+        )
+
         axis.set_title(
             _get_class_title(
                 class_id,
@@ -544,7 +618,8 @@ def plot_channel_rankings(
     figure.suptitle(
         _build_title(
             base_title=(
-                f"Top {top_n} EEG channels by SHAP relevance"
+                f"Top {top_n} EEG channels "
+                "by SHAP relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,

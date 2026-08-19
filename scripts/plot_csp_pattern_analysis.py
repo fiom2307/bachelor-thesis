@@ -291,6 +291,9 @@ def _plot_spatial_relevance(
     """
     Plot channel relevance, channel rankings, and
     scalp topographies for one trial selection.
+
+    All spatial representations use the same numerical
+    relevance scale for correct/incorrect comparisons.
     """
     expected_shape = (
         len(CLASS_NAMES),
@@ -343,6 +346,9 @@ def _plot_spatial_relevance(
         output_dir=(
             channel_relevance_path.parent
         ),
+        class_counts=class_counts,
+        vmin=0.0,
+        vmax=vmax,
     )
 
     # ==========================================================
@@ -364,6 +370,8 @@ def _plot_spatial_relevance(
             channel_rankings_path.parent
         ),
         top_n=10,
+        class_counts=class_counts,
+        xmax=vmax,
     )
 
     # ==========================================================
@@ -497,8 +505,8 @@ def plot_subject_analysis(
     """
     Compute and plot CSP+LDA relevance for one subject.
 
-    Correct and incorrect spatial topographies use
-    the same color scale.
+    Correct and incorrect spatial plots use the same
+    numerical scale.
     """
     subject_name = get_subject_name(
         subject
@@ -571,7 +579,7 @@ def plot_subject_analysis(
     )
 
     # ==========================================================
-    # SHARED SPATIAL COLOR SCALE
+    # SHARED SPATIAL SCALE
     # ==========================================================
 
     spatial_vmax = (
@@ -645,10 +653,6 @@ def plot_subject_analysis(
         mask=trial_temporal_result.incorrect_mask,
     )
 
-    # ==========================================================
-    # CHECK TEMPORAL COUNTS
-    # ==========================================================
-
     if not np.array_equal(
         correct_counts,
         correct_temporal_counts,
@@ -667,10 +671,6 @@ def plot_subject_analysis(
             "spatial and temporal relevance."
         )
 
-    # ==========================================================
-    # CORRECT TEMPORAL RELEVANCE
-    # ==========================================================
-
     _plot_temporal_relevance(
         temporal_relevance=(
             correct_temporal_relevance
@@ -680,10 +680,6 @@ def plot_subject_analysis(
         selection="correct",
         subject=subject,
     )
-
-    # ==========================================================
-    # INCORRECT TEMPORAL RELEVANCE
-    # ==========================================================
 
     _plot_temporal_relevance(
         temporal_relevance=(
@@ -731,10 +727,6 @@ def plot_subject_analysis(
         trial_frequency_result.frequencies
     )
 
-    # ==========================================================
-    # CHECK FREQUENCY COUNTS
-    # ==========================================================
-
     if not np.array_equal(
         correct_counts,
         correct_frequency_counts,
@@ -753,10 +745,6 @@ def plot_subject_analysis(
             "spatial and frequency relevance."
         )
 
-    # ==========================================================
-    # CORRECT FREQUENCY RELEVANCE
-    # ==========================================================
-
     _plot_frequency_relevance(
         frequency_relevance=(
             correct_frequency_relevance
@@ -766,10 +754,6 @@ def plot_subject_analysis(
         selection="correct",
         subject=subject,
     )
-
-    # ==========================================================
-    # INCORRECT FREQUENCY RELEVANCE
-    # ==========================================================
 
     _plot_frequency_relevance(
         frequency_relevance=(
@@ -826,8 +810,8 @@ def plot_global_analysis(
     """
     Plot mean CSP+LDA relevance across all subjects.
 
-    Global correct and incorrect spatial topographies
-    use exactly the same color scale.
+    Global correct and incorrect spatial plots use
+    exactly the same numerical scale.
     """
 
     # ==========================================================
@@ -850,7 +834,6 @@ def plot_global_analysis(
         axis=0,
     )
 
-    # Total number of selected trials across subjects.
     total_correct_counts = np.sum(
         np.stack(
             subject_correct_counts,
@@ -883,10 +866,6 @@ def plot_global_analysis(
         f"vmax: {global_spatial_vmax:.6f}"
     )
 
-    # ==========================================================
-    # GLOBAL CORRECT SPATIAL RELEVANCE
-    # ==========================================================
-
     _plot_spatial_relevance(
         channel_relevance=(
             mean_correct_channel_relevance
@@ -897,10 +876,6 @@ def plot_global_analysis(
         subject=None,
         vmax=global_spatial_vmax,
     )
-
-    # ==========================================================
-    # GLOBAL INCORRECT SPATIAL RELEVANCE
-    # ==========================================================
 
     _plot_spatial_relevance(
         channel_relevance=(
@@ -914,7 +889,7 @@ def plot_global_analysis(
     )
 
     # ==========================================================
-    # CHECK TEMPORAL SHAPES
+    # TEMPORAL
     # ==========================================================
 
     correct_temporal_shapes = {
@@ -941,13 +916,17 @@ def plot_global_analysis(
             "relevance arrays with the same shape."
         )
 
-    # ==========================================================
-    # GLOBAL CORRECT TEMPORAL RELEVANCE
-    # ==========================================================
-
     mean_correct_temporal_relevance = np.nanmean(
         np.stack(
             subject_correct_temporal_relevances,
+            axis=0,
+        ),
+        axis=0,
+    )
+
+    mean_incorrect_temporal_relevance = np.nanmean(
+        np.stack(
+            subject_incorrect_temporal_relevances,
             axis=0,
         ),
         axis=0,
@@ -967,18 +946,6 @@ def plot_global_analysis(
         subject=None,
     )
 
-    # ==========================================================
-    # GLOBAL INCORRECT TEMPORAL RELEVANCE
-    # ==========================================================
-
-    mean_incorrect_temporal_relevance = np.nanmean(
-        np.stack(
-            subject_incorrect_temporal_relevances,
-            axis=0,
-        ),
-        axis=0,
-    )
-
     _plot_temporal_relevance(
         temporal_relevance=(
             mean_incorrect_temporal_relevance
@@ -990,7 +957,7 @@ def plot_global_analysis(
     )
 
     # ==========================================================
-    # CHECK FREQUENCY BINS
+    # FREQUENCY
     # ==========================================================
 
     reference_frequencies = (
@@ -1005,10 +972,6 @@ def plot_global_analysis(
             raise ValueError(
                 "Frequency bins differ between subjects."
             )
-
-    # ==========================================================
-    # CHECK FREQUENCY SHAPES
-    # ==========================================================
 
     correct_frequency_shapes = {
         relevance.shape
@@ -1034,13 +997,17 @@ def plot_global_analysis(
             "relevance arrays with the same shape."
         )
 
-    # ==========================================================
-    # GLOBAL CORRECT FREQUENCY RELEVANCE
-    # ==========================================================
-
     mean_correct_frequency_relevance = np.nanmean(
         np.stack(
             subject_correct_frequency_relevances,
+            axis=0,
+        ),
+        axis=0,
+    )
+
+    mean_incorrect_frequency_relevance = np.nanmean(
+        np.stack(
+            subject_incorrect_frequency_relevances,
             axis=0,
         ),
         axis=0,
@@ -1054,18 +1021,6 @@ def plot_global_analysis(
         subject_name="all_mean",
         selection="correct",
         subject=None,
-    )
-
-    # ==========================================================
-    # GLOBAL INCORRECT FREQUENCY RELEVANCE
-    # ==========================================================
-
-    mean_incorrect_frequency_relevance = np.nanmean(
-        np.stack(
-            subject_incorrect_frequency_relevances,
-            axis=0,
-        ),
-        axis=0,
     )
 
     _plot_frequency_relevance(

@@ -81,17 +81,6 @@ def _create_directory(
     return path
 
 
-def _get_seed_directory(
-    base_directory: Path,
-) -> Path:
-    """
-    Return and create the output directory for the configured seed.
-    """
-    return _create_directory(
-        base_directory / f"seed_{BASE_SEED}"
-    )
-
-
 def _get_subject_spectral_subdir(
     subject: int,
     subdir: str,
@@ -276,7 +265,6 @@ def get_csp_lda_subject_dir(
     """
     return _create_directory(
         CSP_LDA_MODEL_DIR
-        / f"seed_{BASE_SEED}"
         / get_subject_name(subject)
     )
 
@@ -289,7 +277,6 @@ def get_csp_svm_subject_dir(
     """
     return _create_directory(
         CSP_SVM_MODEL_DIR
-        / f"seed_{BASE_SEED}"
         / get_subject_name(subject)
     )
 
@@ -372,7 +359,6 @@ def get_eegnet_subject_dir(
     """
     return _create_directory(
         EEGNET_MODEL_DIR
-        / f"seed_{BASE_SEED}"
         / get_subject_name(subject)
     )
 
@@ -433,9 +419,7 @@ def get_all_confusion_matrices_path() -> Path:
     """
     Return the confusion-matrix figure path for all subjects.
     """
-    output_directory = _get_seed_directory(
-        CONFUSION_MATRIX_RESULTS_DIR
-    )
+    output_directory = CONFUSION_MATRIX_RESULTS_DIR
 
     return (
         output_directory
@@ -456,9 +440,7 @@ def get_subject_confusion_matrices_path(
         subject
     )
 
-    output_directory = _get_seed_directory(
-        CONFUSION_MATRIX_RESULTS_DIR
-    )
+    output_directory = CONFUSION_MATRIX_RESULTS_DIR
 
     return (
         output_directory

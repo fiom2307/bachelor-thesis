@@ -3,6 +3,7 @@ import numpy as np
 from src.data.dataset import get_data_for_subject
 from src.pipelines.csp_lda_pipeline import (
     evaluate_csp_lda_for_subject,
+    evaluate_csp_lda_time_window_for_subject,
 )
 from src.pipelines.eegnet_pipeline import (
     evaluate_eegnet_for_subject,
@@ -63,6 +64,67 @@ def evaluate_models_for_subject(
     )
 
 
+def evaluate_models_for_subject_with_different_time_windows_for_csplda(
+    subject: int,
+    time_windows: list[tuple[float, float]],
+) -> tuple[
+    np.ndarray,
+    dict[
+        tuple[float, float],
+        tuple[float, np.ndarray],
+    ],
+    float,
+    np.ndarray,
+] | None:
+    """
+    Evaluate CSP+LDA for multiple temporal windows and compare
+    them with the original EEGNet model.
+
+    EEGNet is always evaluated using the default epoch window.
+    """
+    data = get_data_for_subject(subject)
+
+    if data is None:
+        return None
+
+    _, _, _, y_eval = data
+
+    eegnet_accuracy, eegnet_predictions = (
+        evaluate_eegnet_for_subject(
+            subject,
+            data,
+        )
+    )
+
+    csp_results = {}
+
+    for tmin, tmax in time_windows:
+        result = (
+            evaluate_csp_lda_time_window_for_subject(
+                subject,
+                tmin,
+                tmax,
+            )
+        )
+
+        if result is None:
+            continue
+
+        csp_accuracy, csp_predictions = result
+
+        csp_results[(tmin, tmax)] = (
+            csp_accuracy,
+            np.asarray(csp_predictions),
+        )
+
+    return (
+        np.asarray(y_eval),
+        csp_results,
+        eegnet_accuracy,
+        np.asarray(eegnet_predictions),
+    )
+
+
 def get_predictions_for_subject(
     subject: int,
 ) -> SubjectPredictions | None:
@@ -106,6 +168,45 @@ def get_accuracies_for_subject(
 
     return (
         csp_accuracy,
+        eegnet_accuracy,
+    )
+
+
+def get_accuracies_for_subject_with_different_time_windows_for_csplda(
+    subject: int,
+    time_windows: list[tuple[float, float]],
+) -> tuple[
+    dict[tuple[float, float], float],
+    float,
+] | None:
+    """
+    Return CSP+LDA accuracies for multiple temporal windows
+    and the original EEGNet accuracy.
+    """
+    evaluation = (
+        evaluate_models_for_subject_with_different_time_windows_for_csplda(
+            subject,
+            time_windows,
+        )
+    )
+
+    if evaluation is None:
+        return None
+
+    (
+        _,
+        csp_results,
+        eegnet_accuracy,
+        _,
+    ) = evaluation
+
+    csp_accuracies = {
+        time_window: accuracy
+        for time_window, (accuracy, _) in csp_results.items()
+    }
+
+    return (
+        csp_accuracies,
         eegnet_accuracy,
     )
 

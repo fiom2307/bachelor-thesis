@@ -3,6 +3,10 @@ import numpy as np
 
 from src.data.data_loader import load_epochs, load_erd_epochs
 from src.utils.paths import get_subject_files
+from src.utils.config import (
+    EPOCH_TMAX,
+    EPOCH_TMIN,
+)
 
 
 SubjectData = tuple[
@@ -15,6 +19,8 @@ SubjectData = tuple[
 
 def get_data_for_subject(
     subject: int,
+    tmin: float = EPOCH_TMIN,
+    tmax: float = EPOCH_TMAX,
 ) -> SubjectData | None:
     """
     Load the preprocessed training and evaluation data for one subject.
@@ -34,12 +40,22 @@ def get_data_for_subject(
 
     train_file, eval_file, mat_file = files
 
-    X_train, y_train = load_epochs(train_file, None)
+    X_train, y_train = load_epochs(
+        train_file, 
+        None,
+        tmin=tmin,
+        tmax=tmax,
+    )
 
     if X_train is None or y_train is None:
         return None
 
-    X_eval, y_eval = load_epochs(eval_file, mat_file)
+    X_eval, y_eval = load_epochs(
+        eval_file, 
+        mat_file,
+        tmin=tmin,
+        tmax=tmax,
+    )
 
     if X_eval is None or y_eval is None:
         return None

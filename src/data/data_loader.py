@@ -18,6 +18,10 @@ from src.data.preprocessing import (
     select_artifact_free_cue_events,
 )
 from src.utils.paths import is_eval_file
+from src.utils.config import (
+    EPOCH_TMAX,
+    EPOCH_TMIN,
+)
 
 
 def load_raw_gdf(file_path: str | Path) -> BaseRaw:
@@ -68,6 +72,8 @@ def load_true_labels(mat_path: str | Path) -> np.ndarray:
 def load_epochs(
     file_path: str | Path, 
     mat_path: str | Path | None = None,
+    tmin: float = EPOCH_TMIN,
+    tmax: float = EPOCH_TMAX,
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     """
     Load and preprocess artifact-free EEG trials from a GDF recording.
@@ -117,6 +123,8 @@ def load_epochs(
         raw_eeg,
         clean_cue_events,
         event_id_used,
+        tmin=tmin,
+        tmax=tmax,
     )
 
     X = get_epochs_data(epochs)

@@ -14,6 +14,8 @@ from src.utils.paths import (
     get_csp_fold_model_path,
     get_lda_fold_model_path,
     get_subject_name,
+    get_csp_time_window_fold_model_path,
+    get_lda_time_window_fold_model_path,
 )
 
 
@@ -66,6 +68,36 @@ def save_csp_lda_fold_models(
     joblib.dump(lda, lda_path)
 
 
+def save_csp_lda_time_window_fold_models(
+    subject: int,
+    fold: int,
+    csp: CSP,
+    lda: LinearDiscriminantAnalysis,
+    tmin: float,
+    tmax: float,
+) -> None:
+    """
+    Save CSP and LDA models trained for one fold
+    and one temporal window.
+    """
+    csp_path = get_csp_time_window_fold_model_path(
+        subject,
+        fold,
+        tmin,
+        tmax,
+    )
+
+    lda_path = get_lda_time_window_fold_model_path(
+        subject,
+        fold,
+        tmin,
+        tmax,
+    )
+
+    joblib.dump(csp, csp_path)
+    joblib.dump(lda, lda_path)
+
+
 def load_csp_lda_fold_models(
     subject: int,
     fold: int,
@@ -79,6 +111,47 @@ def load_csp_lda_fold_models(
     lda_path = get_lda_fold_model_path(subject, fold)
 
     if not (csp_path.exists() and lda_path.exists()):
+        return None
+
+    csp = joblib.load(csp_path)
+    lda = joblib.load(lda_path)
+
+    return csp, lda
+
+
+def load_csp_lda_time_window_fold_models(
+    subject: int,
+    fold: int,
+    tmin: float,
+    tmax: float,
+) -> tuple[
+    CSP,
+    LinearDiscriminantAnalysis,
+] | None:
+    """
+    Load CSP and LDA models saved for one fold
+    and one temporal window.
+
+    Returns None if either model file does not exist.
+    """
+    csp_path = get_csp_time_window_fold_model_path(
+        subject,
+        fold,
+        tmin,
+        tmax,
+    )
+
+    lda_path = get_lda_time_window_fold_model_path(
+        subject,
+        fold,
+        tmin,
+        tmax,
+    )
+
+    if not (
+        csp_path.exists()
+        and lda_path.exists()
+    ):
         return None
 
     csp = joblib.load(csp_path)
@@ -129,6 +202,60 @@ def train_or_load_csp_lda(
             fold,
             csp,
             lda,
+        )
+
+        models.append((csp, lda))
+
+    return models
+
+
+def train_or_load_csp_lda_time_window(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    tmin: float,
+    tmax: float,
+) -> list[tuple[CSP, LinearDiscriminantAnalysis]]:
+    """
+    Train or load CSP+LDA models for a specific temporal window.
+    """
+    seed = BASE_SEED + subject
+    models = []
+
+    for fold, train_idx, _ in get_stratified_folds(
+        X_train,
+        y_train,
+        seed,
+    ):
+        saved_models = load_csp_lda_time_window_fold_models(
+            subject,
+            fold,
+            tmin,
+            tmax,
+        )
+
+        if saved_models is not None:
+            models.append(saved_models)
+            continue
+
+        print(
+            f"Training {get_subject_name(subject)} "
+            f"CSP+LDA fold {fold}/{N_FOLDS} "
+            f"for {tmin:.1f}-{tmax:.1f} s"
+        )
+
+        X_tr = X_train[train_idx]
+        y_tr = y_train[train_idx]
+
+        csp, lda = train_csp_lda(X_tr, y_tr)
+
+        save_csp_lda_time_window_fold_models(
+            subject,
+            fold,
+            csp,
+            lda,
+            tmin,
+            tmax,
         )
 
         models.append((csp, lda))

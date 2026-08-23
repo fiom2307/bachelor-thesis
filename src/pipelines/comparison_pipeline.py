@@ -4,6 +4,7 @@ from src.data.dataset import get_data_for_subject
 from src.pipelines.csp_lda_pipeline import (
     evaluate_csp_lda_for_subject,
     evaluate_csp_lda_time_window_for_subject,
+    evaluate_csp_lda_n_components_for_subject,
 )
 from src.pipelines.eegnet_pipeline import (
     evaluate_eegnet_for_subject,
@@ -125,6 +126,67 @@ def evaluate_models_for_subject_with_different_time_windows_for_csplda(
     )
 
 
+def evaluate_models_for_subject_with_different_n_components_for_csplda(
+    subject: int,
+    n_components_list: list[int],
+) -> tuple[
+    np.ndarray,
+    dict[
+        int,
+        tuple[float, np.ndarray],
+    ],
+    float,
+    np.ndarray,
+] | None:
+    """
+    Evaluate CSP+LDA with different numbers of CSP components
+    and compare them with the original EEGNet model.
+
+    EEGNet is always evaluated using the default CSP-independent
+    preprocessing and original model.
+    """
+    data = get_data_for_subject(subject)
+
+    if data is None:
+        return None
+
+    _, _, _, y_eval = data
+
+    eegnet_accuracy, eegnet_predictions = (
+        evaluate_eegnet_for_subject(
+            subject,
+            data,
+        )
+    )
+
+    csp_results = {}
+
+    for n_components in n_components_list:
+        result = (
+            evaluate_csp_lda_n_components_for_subject(
+                subject,
+                n_components,
+            )
+        )
+
+        if result is None:
+            continue
+
+        csp_accuracy, csp_predictions = result
+
+        csp_results[n_components] = (
+            csp_accuracy,
+            np.asarray(csp_predictions),
+        )
+
+    return (
+        np.asarray(y_eval),
+        csp_results,
+        eegnet_accuracy,
+        np.asarray(eegnet_predictions),
+    )
+
+
 def get_predictions_for_subject(
     subject: int,
 ) -> SubjectPredictions | None:
@@ -203,6 +265,45 @@ def get_accuracies_for_subject_with_different_time_windows_for_csplda(
     csp_accuracies = {
         time_window: accuracy
         for time_window, (accuracy, _) in csp_results.items()
+    }
+
+    return (
+        csp_accuracies,
+        eegnet_accuracy,
+    )
+
+
+def get_accuracies_for_subject_with_different_n_components_for_csplda(
+    subject: int,
+    n_components_list: list[int],
+) -> tuple[
+    dict[int, float],
+    float,
+] | None:
+    """
+    Return CSP+LDA accuracies for multiple numbers of CSP components
+    and the original EEGNet accuracy.
+    """
+    evaluation = (
+        evaluate_models_for_subject_with_different_n_components_for_csplda(
+            subject,
+            n_components_list,
+        )
+    )
+
+    if evaluation is None:
+        return None
+
+    (
+        _,
+        csp_results,
+        eegnet_accuracy,
+        _,
+    ) = evaluation
+
+    csp_accuracies = {
+        n_components: accuracy
+        for n_components, (accuracy, _) in csp_results.items()
     }
 
     return (

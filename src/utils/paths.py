@@ -14,6 +14,7 @@ RESULTS_DIR = ROOT_DIR / "results"
 EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 CSP_LDA_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "csp_lda_time_window"
+CSP_LDA_N_COMPONENTS_MODEL_DIR = MODEL_DIR / "csp_lda_n_components"
 CSP_SVM_MODEL_DIR = MODEL_DIR / "csp_svm"
 
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
@@ -56,6 +57,7 @@ for directory in (
     EEGNET_MODEL_DIR,
     CSP_LDA_MODEL_DIR,
     CSP_LDA_TIME_WINDOW_MODEL_DIR,
+    CSP_LDA_N_COMPONENTS_MODEL_DIR,
     CSP_SVM_MODEL_DIR,
     ACCURACY_RESULTS_DIR,
     CONFUSION_MATRIX_RESULTS_DIR,
@@ -287,6 +289,19 @@ def get_csp_lda_time_window_subject_dir(
     )
 
 
+def get_csp_lda_n_components_subject_dir(
+    subject: int,
+    n_components: int,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return _create_directory(
+        CSP_LDA_N_COMPONENTS_MODEL_DIR
+        / f"{n_components}_components"
+        / subject_name
+    )
+
+
 def get_csp_svm_subject_dir(
     subject: int,
 ) -> Path:
@@ -343,6 +358,26 @@ def get_csp_time_window_fold_model_path(
     )
 
 
+def get_csp_n_components_fold_model_path(
+    subject: int,
+    fold: int,
+    n_components: int,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    filename = (
+        f"{subject_name}_csp_fold{fold}.joblib"
+    )
+
+    return (
+        get_csp_lda_n_components_subject_dir(
+            subject,
+            n_components,
+        )
+        / filename
+    )
+
+
 def get_lda_fold_model_path(
     subject: int,
     fold: int,
@@ -382,6 +417,26 @@ def get_lda_time_window_fold_model_path(
             subject,
             tmin,
             tmax,
+        )
+        / filename
+    )
+
+
+def get_lda_n_components_fold_model_path(
+    subject: int,
+    fold: int,
+    n_components: int,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    filename = (
+        f"{subject_name}_lda_fold{fold}.joblib"
+    )
+
+    return (
+        get_csp_lda_n_components_subject_dir(
+            subject,
+            n_components,
         )
         / filename
     )

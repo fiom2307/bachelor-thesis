@@ -10,6 +10,7 @@ from src.utils.config import (
 def fit_csp(
     X_train: np.ndarray,
     y_train: np.ndarray,
+    n_components: int = CSP_N_COMPONENTS,
 ) -> CSP:
     """
     Fit Common Spatial Patterns (CSP) using the training EEG epochs.
@@ -23,7 +24,7 @@ def fit_csp(
     power is used as input for the LDA classifier.
     """
     csp = CSP(
-        n_components=CSP_N_COMPONENTS,
+        n_components=n_components,
         reg=CSP_REG,
         log=True,
         norm_trace=False,

@@ -1121,18 +1121,32 @@ def _mean_class_relevance(
 ) -> dict[int, np.ndarray]:
     """
     Compute class-wise mean relevance across subjects.
+
+    Subjects without valid relevance values for a class
+    are excluded from the class-wise mean.
     """
     mean_relevance = {}
 
     for class_id in CLASS_LABELS:
-        class_arrays = [
-            relevance[
-                class_id
-            ]
-            for relevance
-            in relevance_list
-            if class_id in relevance
-        ]
+        class_arrays = []
+
+        for relevance in relevance_list:
+            if class_id not in relevance:
+                continue
+
+            values = np.asarray(
+                relevance[class_id],
+                dtype=np.float64,
+            )
+
+            if not np.all(
+                np.isfinite(values)
+            ):
+                continue
+
+            class_arrays.append(
+                values
+            )
 
         if not class_arrays:
             continue
@@ -1140,7 +1154,10 @@ def _mean_class_relevance(
         mean_relevance[
             class_id
         ] = np.mean(
-            class_arrays,
+            np.stack(
+                class_arrays,
+                axis=0,
+            ),
             axis=0,
         )
 

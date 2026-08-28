@@ -6,6 +6,12 @@ from src.pipelines.comparison_pipeline import (
     get_accuracies_for_subject,
     get_accuracies_for_subject_with_different_time_windows_for_csplda,
 )
+from src.visualization.csplda_time_window_accuracies import (
+    plot_csplda_time_window_accuracy_comparison,
+)
+from src.utils.paths import (
+    get_csp_lda_time_window_accuracy_plot_path,
+)
 
 
 TimeWindowAccuracyResult = tuple[
@@ -41,8 +47,6 @@ def run_experiment() -> list[TimeWindowAccuracyResult]:
 
     for subject in range(1, 10):
         subject_name = f"A{subject:02d}"
-
-        print(f"\nRunning {subject_name}...")
 
         window_results = (
             get_accuracies_for_subject_with_different_time_windows_for_csplda(
@@ -85,135 +89,80 @@ def run_experiment() -> list[TimeWindowAccuracyResult]:
     return results
 
 
-def print_time_window_accuracy_comparison(
+def compute_mean_accuracies(
     results: list[TimeWindowAccuracyResult],
-) -> None:
+) -> tuple[
+    list[tuple[float, float]],
+    list[float],
+    float,
+    float,
+]:
     """
-    Print CSP+LDA accuracies grouped by temporal window.
-
-    Each temporal-window CSP+LDA model is compared with
-    the original CSP+LDA and EEGNet models.
+    Compute mean accuracies across subjects for each temporal window.
     """
-    grouped_results = defaultdict(list)
+    grouped_window_accuracies = defaultdict(list)
+    baseline_accuracies_by_subject = {}
+    eegnet_accuracies_by_subject = {}
 
-    for result in results:
-        (
-            subject_name,
-            tmin,
-            tmax,
-            csp_window_accuracy,
-            csp_baseline_accuracy,
-            eegnet_accuracy,
-        ) = result
+    for (
+        subject_name,
+        tmin,
+        tmax,
+        csp_window_accuracy,
+        csp_baseline_accuracy,
+        eegnet_accuracy,
+    ) in results:
+        grouped_window_accuracies[
+            (tmin, tmax)
+        ].append(
+            csp_window_accuracy
+        )
 
-        grouped_results[(tmin, tmax)].append(
-            (
-                subject_name,
-                csp_window_accuracy,
-                csp_baseline_accuracy,
-                eegnet_accuracy,
+        baseline_accuracies_by_subject[
+            subject_name
+        ] = csp_baseline_accuracy
+
+        eegnet_accuracies_by_subject[
+            subject_name
+        ] = eegnet_accuracy
+
+    ordered_time_windows = [
+        window
+        for window in TIME_WINDOWS
+        if window in grouped_window_accuracies
+    ]
+
+    mean_window_accuracies = [
+        float(
+            np.mean(
+                grouped_window_accuracies[window]
             )
         )
+        for window in ordered_time_windows
+    ]
 
-    for (tmin, tmax), window_results in grouped_results.items():
-        print()
-        print("=" * 90)
-        print(
-            f"CSP+LDA time window: "
-            f"{tmin:.1f}-{tmax:.1f} s"
-        )
-        print("=" * 90)
-
-        print(
-            f"{'Subject':<12}"
-            f"{'CSP+LDA window':<20}"
-            f"{'CSP+LDA baseline':<22}"
-            f"{'EEGNet':<15}"
-            f"{'Δ baseline':<15}"
-        )
-
-        print("-" * 90)
-
-        window_accuracies = []
-        baseline_accuracies = []
-        eegnet_accuracies = []
-
-        for (
-            subject_name,
-            csp_window_accuracy,
-            csp_baseline_accuracy,
-            eegnet_accuracy,
-        ) in window_results:
-            difference_baseline = (
-                csp_window_accuracy
-                - csp_baseline_accuracy
+    mean_baseline_accuracy = float(
+        np.mean(
+            list(
+                baseline_accuracies_by_subject.values()
             )
+        )
+    )
 
-            window_accuracies.append(
-                csp_window_accuracy
+    mean_eegnet_accuracy = float(
+        np.mean(
+            list(
+                eegnet_accuracies_by_subject.values()
             )
-
-            baseline_accuracies.append(
-                csp_baseline_accuracy
-            )
-
-            eegnet_accuracies.append(
-                eegnet_accuracy
-            )
-
-            print(
-                f"{subject_name:<12}"
-                f"{csp_window_accuracy:<20.4f}"
-                f"{csp_baseline_accuracy:<22.4f}"
-                f"{eegnet_accuracy:<15.4f}"
-                f"{difference_baseline:+.4f}"
-            )
-
-        mean_window = float(
-            np.mean(window_accuracies)
         )
+    )
 
-        mean_baseline = float(
-            np.mean(baseline_accuracies)
-        )
-
-        mean_eegnet = float(
-            np.mean(eegnet_accuracies)
-        )
-
-        mean_improvement = (
-            mean_window
-            - mean_baseline
-        )
-
-        gap_to_eegnet = (
-            mean_eegnet
-            - mean_window
-        )
-
-        print("-" * 90)
-
-        print(
-            f"{'Mean':<12}"
-            f"{mean_window:<20.4f}"
-            f"{mean_baseline:<22.4f}"
-            f"{mean_eegnet:<15.4f}"
-            f"{mean_improvement:+.4f}"
-        )
-
-        print()
-
-        print(
-            f"Mean change vs CSP+LDA baseline: "
-            f"{mean_improvement:+.4f} "
-            f"({mean_improvement * 100:+.2f} pp)"
-        )
-
-        print(
-            f"Mean gap to EEGNet: "
-            f"{gap_to_eegnet:+.4f} "
-            f"({gap_to_eegnet * 100:+.2f} pp)"
-        )
+    return (
+        ordered_time_windows,
+        mean_window_accuracies,
+        mean_baseline_accuracy,
+        mean_eegnet_accuracy,
+    )
 
 
 def main() -> None:
@@ -224,8 +173,23 @@ def main() -> None:
             "No experiment results were generated."
         )
 
-    print_time_window_accuracy_comparison(
+    (
+        time_windows,
+        mean_window_accuracies,
+        mean_baseline_accuracy,
+        mean_eegnet_accuracy,
+    ) = compute_mean_accuracies(
         results,
+    )
+
+    plot_csplda_time_window_accuracy_comparison(
+        time_windows=time_windows,
+        mean_window_accuracies=mean_window_accuracies,
+        mean_baseline_accuracy=mean_baseline_accuracy,
+        mean_eegnet_accuracy=mean_eegnet_accuracy,
+        output_path=(
+            get_csp_lda_time_window_accuracy_plot_path()
+        ),
     )
 
 

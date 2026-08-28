@@ -24,6 +24,8 @@ SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
 CSP_PATTERN_ANALYSIS_DIR = RESULTS_DIR / "csp_pattern_analysis"
 
+CSP_LDA_EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "csp_lda_experiments"
+
 
 TrialSelection = Literal[
     "correct",
@@ -64,6 +66,7 @@ for directory in (
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
     CSP_PATTERN_ANALYSIS_DIR,
+    CSP_LDA_EXPERIMENT_RESULTS_DIR,
 ):
     directory.mkdir(
         parents=True,
@@ -808,4 +811,24 @@ def get_csp_topographies_path(
     return _get_csp_pattern_plot_path(
         plot_type="topographies",
         subject=subject,
+    )
+
+
+def get_csp_lda_time_window_accuracy_plot_path() -> Path:
+    """
+    Return the CSP+LDA time-window accuracy comparison plot path.
+    """
+    return (
+        CSP_LDA_EXPERIMENT_RESULTS_DIR
+        / "time_window_accuracy_comparison.png"
+    )
+
+
+def get_csp_lda_n_components_accuracy_plot_path() -> Path:
+    """
+    Return the CSP+LDA component-count accuracy comparison plot path.
+    """
+    return (
+        CSP_LDA_EXPERIMENT_RESULTS_DIR
+        / "n_components_accuracy_comparison.png"
     )

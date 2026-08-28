@@ -6,6 +6,12 @@ from src.pipelines.comparison_pipeline import (
     get_accuracies_for_subject,
     get_accuracies_for_subject_with_different_n_components_for_csplda,
 )
+from src.utils.paths import (
+    get_csp_lda_n_components_accuracy_plot_path,
+)
+from src.visualization.csplda_n_components_accuracies import (
+    plot_csplda_n_components_accuracy_comparison,
+)
 
 
 NComponentsAccuracyResult = tuple[
@@ -37,8 +43,6 @@ def run_experiment() -> list[NComponentsAccuracyResult]:
 
     for subject in range(1, 10):
         subject_name = f"A{subject:02d}"
-
-        print(f"\nRunning {subject_name}...")
 
         component_results = (
             get_accuracies_for_subject_with_different_n_components_for_csplda(
@@ -80,137 +84,82 @@ def run_experiment() -> list[NComponentsAccuracyResult]:
     return results
 
 
-def print_n_components_accuracy_comparison(
+def compute_mean_accuracies(
     results: list[NComponentsAccuracyResult],
-) -> None:
+) -> tuple[
+    list[int],
+    list[float],
+    float,
+    float,
+]:
     """
-    Print CSP+LDA accuracies grouped by number of CSP components.
-
-    Each configuration is compared with the original CSP+LDA
-    and EEGNet models.
+    Compute mean accuracies across subjects for each number
+    of CSP components.
     """
-    grouped_results = defaultdict(list)
-
-    for result in results:
-        (
-            subject_name,
-            n_components,
-            csp_component_accuracy,
-            csp_baseline_accuracy,
-            eegnet_accuracy,
-        ) = result
-
-        grouped_results[n_components].append(
-            (
-                subject_name,
-                csp_component_accuracy,
-                csp_baseline_accuracy,
-                eegnet_accuracy,
-            )
-        )
+    grouped_component_accuracies = defaultdict(list)
+    baseline_accuracies_by_subject = {}
+    eegnet_accuracies_by_subject = {}
 
     for (
+        subject_name,
         n_components,
-        component_results,
-    ) in grouped_results.items():
-        print()
-        print("=" * 90)
-        print(
-            f"CSP+LDA number of components: "
-            f"{n_components}"
-        )
-        print("=" * 90)
-
-        print(
-            f"{'Subject':<12}"
-            f"{'CSP+LDA components':<22}"
-            f"{'CSP+LDA baseline':<22}"
-            f"{'EEGNet':<15}"
-            f"{'Δ baseline':<15}"
+        csp_component_accuracy,
+        csp_baseline_accuracy,
+        eegnet_accuracy,
+    ) in results:
+        grouped_component_accuracies[
+            n_components
+        ].append(
+            csp_component_accuracy
         )
 
-        print("-" * 90)
+        baseline_accuracies_by_subject[
+            subject_name
+        ] = csp_baseline_accuracy
 
-        component_accuracies = []
-        baseline_accuracies = []
-        eegnet_accuracies = []
+        eegnet_accuracies_by_subject[
+            subject_name
+        ] = eegnet_accuracy
 
-        for (
-            subject_name,
-            csp_component_accuracy,
-            csp_baseline_accuracy,
-            eegnet_accuracy,
-        ) in component_results:
-            difference_baseline = (
-                csp_component_accuracy
-                - csp_baseline_accuracy
+    ordered_n_components = [
+        n_components
+        for n_components in N_COMPONENTS_LIST
+        if n_components in grouped_component_accuracies
+    ]
+
+    mean_component_accuracies = [
+        float(
+            np.mean(
+                grouped_component_accuracies[
+                    n_components
+                ]
             )
+        )
+        for n_components in ordered_n_components
+    ]
 
-            component_accuracies.append(
-                csp_component_accuracy
+    mean_baseline_accuracy = float(
+        np.mean(
+            list(
+                baseline_accuracies_by_subject.values()
             )
+        )
+    )
 
-            baseline_accuracies.append(
-                csp_baseline_accuracy
+    mean_eegnet_accuracy = float(
+        np.mean(
+            list(
+                eegnet_accuracies_by_subject.values()
             )
-
-            eegnet_accuracies.append(
-                eegnet_accuracy
-            )
-
-            print(
-                f"{subject_name:<12}"
-                f"{csp_component_accuracy:<22.4f}"
-                f"{csp_baseline_accuracy:<22.4f}"
-                f"{eegnet_accuracy:<15.4f}"
-                f"{difference_baseline:+.4f}"
-            )
-
-        mean_components = float(
-            np.mean(component_accuracies)
         )
+    )
 
-        mean_baseline = float(
-            np.mean(baseline_accuracies)
-        )
-
-        mean_eegnet = float(
-            np.mean(eegnet_accuracies)
-        )
-
-        mean_improvement = (
-            mean_components
-            - mean_baseline
-        )
-
-        gap_to_eegnet = (
-            mean_eegnet
-            - mean_components
-        )
-
-        print("-" * 90)
-
-        print(
-            f"{'Mean':<12}"
-            f"{mean_components:<22.4f}"
-            f"{mean_baseline:<22.4f}"
-            f"{mean_eegnet:<15.4f}"
-            f"{mean_improvement:+.4f}"
-        )
-
-        print()
-
-        print(
-            f"Mean change vs CSP+LDA baseline: "
-            f"{mean_improvement:+.4f} "
-            f"({mean_improvement * 100:+.2f} pp)"
-        )
-
-        print(
-            f"Mean gap to EEGNet: "
-            f"{gap_to_eegnet:+.4f} "
-            f"({gap_to_eegnet * 100:+.2f} pp)"
-        )
+    return (
+        ordered_n_components,
+        mean_component_accuracies,
+        mean_baseline_accuracy,
+        mean_eegnet_accuracy,
+    )
 
 
 def main() -> None:
@@ -221,8 +170,23 @@ def main() -> None:
             "No experiment results were generated."
         )
 
-    print_n_components_accuracy_comparison(
+    (
+        n_components_list,
+        mean_component_accuracies,
+        mean_baseline_accuracy,
+        mean_eegnet_accuracy,
+    ) = compute_mean_accuracies(
         results,
+    )
+
+    plot_csplda_n_components_accuracy_comparison(
+        n_components_list=n_components_list,
+        mean_component_accuracies=mean_component_accuracies,
+        mean_baseline_accuracy=mean_baseline_accuracy,
+        mean_eegnet_accuracy=mean_eegnet_accuracy,
+        output_path=(
+            get_csp_lda_n_components_accuracy_plot_path()
+        ),
     )
 
 

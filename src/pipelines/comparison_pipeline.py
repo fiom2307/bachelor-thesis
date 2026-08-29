@@ -9,6 +9,9 @@ from src.pipelines.csp_lda_pipeline import (
 from src.pipelines.eegnet_pipeline import (
     evaluate_eegnet_for_subject,
 )
+from src.pipelines.fbcsp_lda_pipeline import (
+    evaluate_fbcsp_lda_for_subject,
+)
 
 
 SubjectEvaluation = tuple[
@@ -351,4 +354,51 @@ def collect_all_predictions() -> SubjectPredictions:
         np.concatenate(all_y_true),
         np.concatenate(all_csp_predictions),
         np.concatenate(all_eegnet_predictions),
+    )
+
+
+def get_accuracies_for_subject_with_fbcsp(
+    subject: int,
+) -> tuple[
+    float,
+    float,
+    float,
+]:
+    """
+    Compare baseline CSP+LDA, FBCSP+LDA, and EEGNet
+    for one subject.
+
+    Returns
+    -------
+    csp_lda_accuracy
+        Accuracy of the original broadband CSP+LDA model.
+
+    fbcsp_lda_accuracy
+        Accuracy of the FBCSP+LDA model.
+
+    eegnet_accuracy
+        Accuracy of EEGNet.
+    """
+    data = get_data_for_subject(subject)
+
+    if data is None:
+        raise ValueError(
+            f"No data available for subject {subject}."
+        )
+
+    csp_lda_accuracy, eegnet_accuracy = (
+        get_accuracies_for_subject(subject)
+    )
+
+    fbcsp_result = evaluate_fbcsp_lda_for_subject(
+        subject,
+        data,
+    )
+
+    fbcsp_lda_accuracy, _ = fbcsp_result
+
+    return (
+        csp_lda_accuracy,
+        fbcsp_lda_accuracy,
+        eegnet_accuracy,
     )

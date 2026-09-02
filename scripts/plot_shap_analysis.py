@@ -651,12 +651,22 @@ def plot_mean_shap(
         VectorRelevance,
     ] = {}
 
+    std_frequency_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
     mean_trial_counts_by_selection: dict[
         TrialSelection,
         TrialCounts,
     ] = {}
 
     channel_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    channel_relevance_stds: dict[
         TrialSelection,
         VectorRelevance,
     ] = {}
@@ -668,7 +678,17 @@ def plot_mean_shap(
         VectorRelevance,
     ] = {}
 
+    temporal_relevance_stds: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
     topographic_relevances: dict[
+        TrialSelection,
+        VectorRelevance,
+    ] = {}
+
+    topographic_relevance_stds: dict[
         TrialSelection,
         VectorRelevance,
     ] = {}
@@ -709,6 +729,12 @@ def plot_mean_shap(
             )
         )
 
+        std_frequency_relevance = (
+            _std_class_relevance(
+                frequency_relevance_list
+            )
+        )
+
         mean_trial_counts = (
             _sum_trial_counts(
                 aggregated_trial_counts[
@@ -723,6 +749,16 @@ def plot_mean_shap(
             )
         )
 
+        channel_relevance_std = (
+            _std_class_relevance([
+                compute_channel_shap_relevance(
+                    class_relevance
+                )
+                for class_relevance
+                in class_relevance_list
+            ])
+        )
+
         channel_rankings = rank_shap_channels(
             channel_relevance=channel_relevance,
             channel_names=channel_names,
@@ -734,12 +770,34 @@ def plot_mean_shap(
             )
         )
 
+        temporal_relevance_std = (
+            _std_class_relevance([
+                compute_temporal_shap_relevance(
+                    class_relevance
+                )
+                for class_relevance
+                in class_relevance_list
+            ])
+        )
+
         topographic_relevance = (
             compute_topographic_shap_relevance(
                 class_relevance=mean_class_relevance,
                 times=reference_times,
                 imagery_window=IMAGERY_WINDOW,
             )
+        )
+
+        topographic_relevance_std = (
+            _std_class_relevance([
+                compute_topographic_shap_relevance(
+                    class_relevance=class_relevance,
+                    times=reference_times,
+                    imagery_window=IMAGERY_WINDOW,
+                )
+                for class_relevance
+                in class_relevance_list
+            ])
         )
 
         mean_class_relevances[
@@ -750,6 +808,10 @@ def plot_mean_shap(
             trial_selection
         ] = mean_frequency_relevance
 
+        std_frequency_relevances[
+            trial_selection
+        ] = std_frequency_relevance
+
         mean_trial_counts_by_selection[
             trial_selection
         ] = mean_trial_counts
@@ -757,6 +819,10 @@ def plot_mean_shap(
         channel_relevances[
             trial_selection
         ] = channel_relevance
+
+        channel_relevance_stds[
+            trial_selection
+        ] = channel_relevance_std
 
         channel_rankings_by_selection[
             trial_selection
@@ -766,9 +832,17 @@ def plot_mean_shap(
             trial_selection
         ] = temporal_relevance
 
+        temporal_relevance_stds[
+            trial_selection
+        ] = temporal_relevance_std
+
         topographic_relevances[
             trial_selection
         ] = topographic_relevance
+
+        topographic_relevance_stds[
+            trial_selection
+        ] = topographic_relevance_std
 
     # ------------------------------------------------------------------
     # Shared scales for correct + incorrect global plots
@@ -776,25 +850,37 @@ def plot_mean_shap(
 
     channel_vmax = (
         _compute_shared_relevance_max(
-            channel_relevances
+            _sum_relevance_mappings(
+                channel_relevances,
+                channel_relevance_stds,
+            )
         )
     )
 
     temporal_ymax = (
         _compute_shared_relevance_max(
-            temporal_relevances
+            _sum_relevance_mappings(
+                temporal_relevances,
+                temporal_relevance_stds,
+            )
         )
     )
 
     frequency_ymax = (
         _compute_shared_relevance_max(
-            mean_frequency_relevances
+            _sum_relevance_mappings(
+                mean_frequency_relevances,
+                std_frequency_relevances,
+            )
         )
     )
 
     topography_vmax = (
         _compute_shared_relevance_max(
-            topographic_relevances
+            _sum_relevance_mappings(
+                topographic_relevances,
+                topographic_relevance_stds,
+            )
         )
     )
 
@@ -835,6 +921,12 @@ def plot_mean_shap(
             ]
         )
 
+        std_frequency_relevance = (
+            std_frequency_relevances[
+                trial_selection
+            ]
+        )
+
         mean_trial_counts = (
             mean_trial_counts_by_selection[
                 trial_selection
@@ -843,6 +935,12 @@ def plot_mean_shap(
 
         channel_relevance = (
             channel_relevances[
+                trial_selection
+            ]
+        )
+
+        channel_relevance_std = (
+            channel_relevance_stds[
                 trial_selection
             ]
         )
@@ -859,8 +957,20 @@ def plot_mean_shap(
             ]
         )
 
+        temporal_relevance_std = (
+            temporal_relevance_stds[
+                trial_selection
+            ]
+        )
+
         topographic_relevance = (
             topographic_relevances[
+                trial_selection
+            ]
+        )
+
+        topographic_relevance_std = (
+            topographic_relevance_stds[
                 trial_selection
             ]
         )
@@ -872,6 +982,9 @@ def plot_mean_shap(
                 trial_selection=trial_selection,
                 subject=None,
                 trial_counts=mean_trial_counts,
+                channel_relevance_std=(
+                    channel_relevance_std
+                ),
                 vmin=0.0,
                 vmax=channel_vmax,
             )
@@ -896,6 +1009,9 @@ def plot_mean_shap(
                 subject=None,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=mean_trial_counts,
+                temporal_relevance_std=(
+                    temporal_relevance_std
+                ),
                 ymin=0.0,
                 ymax=temporal_ymax,
             )
@@ -910,6 +1026,9 @@ def plot_mean_shap(
                 trial_selection=trial_selection,
                 subject=None,
                 trial_counts=mean_trial_counts,
+                frequency_relevance_std=(
+                    std_frequency_relevance
+                ),
                 ymin=0.0,
                 ymax=frequency_ymax,
             )
@@ -925,6 +1044,9 @@ def plot_mean_shap(
                 subject=None,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=mean_trial_counts,
+                topographic_relevance_std=(
+                    topographic_relevance_std
+                ),
                 vmin=0.0,
                 vmax=topography_vmax,
             )
@@ -1162,6 +1284,116 @@ def _mean_class_relevance(
         )
 
     return mean_relevance
+
+
+def _std_class_relevance(
+    relevance_list: list[
+        Mapping[
+            int,
+            np.ndarray,
+        ]
+    ],
+) -> dict[int, np.ndarray]:
+    """
+    Compute class-wise sample SD across subjects.
+    """
+    std_relevance = {}
+
+    for class_id in CLASS_LABELS:
+        class_arrays = []
+
+        for relevance in relevance_list:
+            if class_id not in relevance:
+                continue
+
+            values = np.asarray(
+                relevance[class_id],
+                dtype=np.float64,
+            )
+
+            if not np.all(
+                np.isfinite(values)
+            ):
+                continue
+
+            class_arrays.append(
+                values
+            )
+
+        if not class_arrays:
+            continue
+
+        if len(class_arrays) == 1:
+            std_relevance[
+                class_id
+            ] = np.zeros_like(
+                class_arrays[0],
+                dtype=np.float64,
+            )
+            continue
+
+        std_relevance[
+            class_id
+        ] = np.std(
+            np.stack(
+                class_arrays,
+                axis=0,
+            ),
+            axis=0,
+            ddof=1,
+        )
+
+    return std_relevance
+
+
+def _sum_relevance_mappings(
+    left: Mapping[
+        TrialSelection,
+        VectorRelevance,
+    ],
+    right: Mapping[
+        TrialSelection,
+        VectorRelevance,
+    ],
+) -> dict[
+    TrialSelection,
+    dict[int, np.ndarray],
+]:
+    """
+    Sum matching class-wise relevance mappings.
+    """
+    summed = {}
+
+    for trial_selection, relevance in left.items():
+        std_relevance = right.get(
+            trial_selection,
+            {},
+        )
+
+        summed[
+            trial_selection
+        ] = {
+            class_id: (
+                np.asarray(
+                    values,
+                    dtype=np.float64,
+                )
+                + np.asarray(
+                    std_relevance.get(
+                        class_id,
+                        np.zeros_like(
+                            values,
+                            dtype=np.float64,
+                        ),
+                    ),
+                    dtype=np.float64,
+                )
+            )
+            for class_id, values
+            in relevance.items()
+        }
+
+    return summed
 
 
 def _sum_trial_counts(

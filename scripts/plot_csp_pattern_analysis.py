@@ -286,6 +286,7 @@ def _plot_spatial_relevance(
     selection: str,
     subject: int | None,
     vmax: float,
+    channel_relevance_std: np.ndarray | None = None,
 ) -> None:
     """
     Plot channel relevance, rankings and topographies.
@@ -339,6 +340,7 @@ def _plot_spatial_relevance(
             channel_relevance_path.parent
         ),
         class_counts=class_counts,
+        channel_relevance_std=channel_relevance_std,
         vmin=0.0,
         vmax=vmax,
     )
@@ -386,6 +388,7 @@ def _plot_spatial_relevance(
         ),
         sfreq=SFREQ,
         class_counts=class_counts,
+        channel_relevance_std=channel_relevance_std,
         vmin=0.0,
         vmax=vmax,
     )
@@ -399,6 +402,7 @@ def _plot_temporal_relevance(
     selection: str,
     subject: int | None,
     ymax: float,
+    temporal_relevance_std: np.ndarray | None = None,
 ) -> None:
     """
     Plot temporal relevance for one trial selection.
@@ -433,6 +437,7 @@ def _plot_temporal_relevance(
             temporal_relevance_path.parent
         ),
         class_counts=class_counts,
+        temporal_relevance_std=temporal_relevance_std,
         ymin=0.0,
         ymax=ymax,
     )
@@ -446,6 +451,7 @@ def _plot_frequency_relevance(
     selection: str,
     subject: int | None,
     ymax: float,
+    frequency_relevance_std: np.ndarray | None = None,
 ) -> None:
     """
     Plot frequency relevance for one trial selection.
@@ -496,9 +502,52 @@ def _plot_frequency_relevance(
             frequency_relevance_path.parent
         ),
         class_counts=class_counts,
+        frequency_relevance_std=frequency_relevance_std,
         ymin=0.0,
         ymax=ymax,
     )
+
+
+def _nanstd_across_subjects(
+    relevances: list[np.ndarray],
+) -> np.ndarray:
+    """
+    Compute sample SD across subjects while preserving all-NaN bins.
+    """
+    stacked = np.stack(
+        relevances,
+        axis=0,
+    )
+
+    valid_counts = np.sum(
+        np.isfinite(
+            stacked
+        ),
+        axis=0,
+    )
+
+    std = np.zeros_like(
+        np.nanmean(
+            stacked,
+            axis=0,
+        )
+    )
+
+    enough_subjects = (
+        valid_counts > 1
+    )
+
+    std[enough_subjects] = np.nanstd(
+        stacked,
+        axis=0,
+        ddof=1,
+    )[enough_subjects]
+
+    std[
+        valid_counts == 0
+    ] = np.nan
+
+    return std
 
 
 def plot_subject_analysis(
@@ -870,6 +919,12 @@ def plot_global_analysis(
         axis=0,
     )
 
+    std_correct_channel_relevance = (
+        _nanstd_across_subjects(
+            subject_correct_channel_relevances
+        )
+    )
+
     mean_incorrect_channel_relevance = np.nanmean(
         np.stack(
             subject_incorrect_channel_relevances,
@@ -878,9 +933,21 @@ def plot_global_analysis(
         axis=0,
     )
 
+    std_incorrect_channel_relevance = (
+        _nanstd_across_subjects(
+            subject_incorrect_channel_relevances
+        )
+    )
+
     global_spatial_vmax = _compute_shared_max(
-        mean_correct_channel_relevance,
-        mean_incorrect_channel_relevance,
+        (
+            mean_correct_channel_relevance
+            + std_correct_channel_relevance
+        ),
+        (
+            mean_incorrect_channel_relevance
+            + std_incorrect_channel_relevance
+        ),
     )
 
     print(
@@ -897,6 +964,9 @@ def plot_global_analysis(
         selection="correct",
         subject=None,
         vmax=global_spatial_vmax,
+        channel_relevance_std=(
+            std_correct_channel_relevance
+        ),
     )
 
     _plot_spatial_relevance(
@@ -908,6 +978,9 @@ def plot_global_analysis(
         selection="incorrect",
         subject=None,
         vmax=global_spatial_vmax,
+        channel_relevance_std=(
+            std_incorrect_channel_relevance
+        ),
     )
 
     # ==========================================================
@@ -946,6 +1019,12 @@ def plot_global_analysis(
         axis=0,
     )
 
+    std_correct_temporal_relevance = (
+        _nanstd_across_subjects(
+            subject_correct_temporal_relevances
+        )
+    )
+
     mean_incorrect_temporal_relevance = np.nanmean(
         np.stack(
             subject_incorrect_temporal_relevances,
@@ -954,13 +1033,25 @@ def plot_global_analysis(
         axis=0,
     )
 
+    std_incorrect_temporal_relevance = (
+        _nanstd_across_subjects(
+            subject_incorrect_temporal_relevances
+        )
+    )
+
     times = _create_times(
         mean_correct_temporal_relevance.shape[1]
     )
 
     global_temporal_ymax = _compute_shared_max(
-        mean_correct_temporal_relevance,
-        mean_incorrect_temporal_relevance,
+        (
+            mean_correct_temporal_relevance
+            + std_correct_temporal_relevance
+        ),
+        (
+            mean_incorrect_temporal_relevance
+            + std_incorrect_temporal_relevance
+        ),
     )
 
     print(
@@ -978,6 +1069,9 @@ def plot_global_analysis(
         selection="correct",
         subject=None,
         ymax=global_temporal_ymax,
+        temporal_relevance_std=(
+            std_correct_temporal_relevance
+        ),
     )
 
     _plot_temporal_relevance(
@@ -990,6 +1084,9 @@ def plot_global_analysis(
         selection="incorrect",
         subject=None,
         ymax=global_temporal_ymax,
+        temporal_relevance_std=(
+            std_incorrect_temporal_relevance
+        ),
     )
 
     # ==========================================================
@@ -1041,6 +1138,12 @@ def plot_global_analysis(
         axis=0,
     )
 
+    std_correct_frequency_relevance = (
+        _nanstd_across_subjects(
+            subject_correct_frequency_relevances
+        )
+    )
+
     mean_incorrect_frequency_relevance = np.nanmean(
         np.stack(
             subject_incorrect_frequency_relevances,
@@ -1049,13 +1152,25 @@ def plot_global_analysis(
         axis=0,
     )
 
+    std_incorrect_frequency_relevance = (
+        _nanstd_across_subjects(
+            subject_incorrect_frequency_relevances
+        )
+    )
+
     # ==========================================================
     # GLOBAL SHARED FREQUENCY Y-AXIS
     # ==========================================================
 
     global_frequency_ymax = _compute_shared_max(
-        mean_correct_frequency_relevance,
-        mean_incorrect_frequency_relevance,
+        (
+            mean_correct_frequency_relevance
+            + std_correct_frequency_relevance
+        ),
+        (
+            mean_incorrect_frequency_relevance
+            + std_incorrect_frequency_relevance
+        ),
     )
 
     print(
@@ -1073,6 +1188,9 @@ def plot_global_analysis(
         selection="correct",
         subject=None,
         ymax=global_frequency_ymax,
+        frequency_relevance_std=(
+            std_correct_frequency_relevance
+        ),
     )
 
     _plot_frequency_relevance(
@@ -1085,6 +1203,9 @@ def plot_global_analysis(
         selection="incorrect",
         subject=None,
         ymax=global_frequency_ymax,
+        frequency_relevance_std=(
+            std_incorrect_frequency_relevance
+        ),
     )
 
 

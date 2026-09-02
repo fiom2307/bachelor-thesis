@@ -14,6 +14,7 @@ def plot_csp_channel_relevance(
     subject: str,
     output_dir,
     class_counts: np.ndarray | None = None,
+    channel_relevance_std: np.ndarray | None = None,
     vmin: float = 0.0,
     vmax: float | None = None,
 ) -> None:
@@ -38,6 +39,18 @@ def plot_csp_channel_relevance(
             "channel_relevance must have shape "
             f"{expected_shape}."
         )
+
+    if channel_relevance_std is not None:
+        channel_relevance_std = np.asarray(
+            channel_relevance_std,
+            dtype=np.float64,
+        )
+
+        if channel_relevance_std.shape != expected_shape:
+            raise ValueError(
+                "channel_relevance_std must have shape "
+                f"{expected_shape}."
+            )
 
     if class_counts is not None:
         class_counts = np.asarray(
@@ -91,40 +104,34 @@ def plot_csp_channel_relevance(
     # Plot
     # ----------------------------------------------------------
 
-    fig, ax = plt.subplots(
-        figsize=(15, 5),
+    n_panels = (
+        2
+        if channel_relevance_std is not None
+        else 1
+    )
+
+    fig, axes = plt.subplots(
+        n_panels,
+        1,
+        figsize=(15, 5 * n_panels),
         constrained_layout=True,
+    )
+
+    axes = np.atleast_1d(
+        axes
     )
 
     masked_relevance = np.ma.masked_invalid(
         channel_relevance
     )
 
-    image = ax.imshow(
+    image = axes[0].imshow(
         masked_relevance,
         aspect="auto",
         interpolation="nearest",
         cmap="viridis",
         vmin=vmin,
         vmax=vmax,
-    )
-
-    ax.set_xticks(
-        np.arange(
-            len(channel_names)
-        )
-    )
-
-    ax.set_xticklabels(
-        channel_names,
-        rotation=45,
-        ha="right",
-    )
-
-    ax.set_yticks(
-        np.arange(
-            len(class_names)
-        )
     )
 
     if class_counts is None:
@@ -137,17 +144,58 @@ def plot_csp_channel_relevance(
             in enumerate(class_names)
         ]
 
-    ax.set_yticklabels(
-        y_labels
-    )
+    if channel_relevance_std is not None:
+        masked_std = np.ma.masked_invalid(
+            channel_relevance_std
+        )
 
-    ax.set_xlabel(
-        "EEG channel"
-    )
+        axes[1].imshow(
+            masked_std,
+            aspect="auto",
+            interpolation="nearest",
+            cmap="viridis",
+            vmin=vmin,
+            vmax=vmax,
+        )
 
-    ax.set_ylabel(
-        "Motor-imagery class"
-    )
+        axes[0].set_title(
+            "Mean"
+        )
+
+        axes[1].set_title(
+            "Standard deviation across subjects"
+        )
+
+    for axis in axes:
+        axis.set_xticks(
+            np.arange(
+                len(channel_names)
+            )
+        )
+
+        axis.set_xticklabels(
+            channel_names,
+            rotation=45,
+            ha="right",
+        )
+
+        axis.set_yticks(
+            np.arange(
+                len(class_names)
+            )
+        )
+
+        axis.set_yticklabels(
+            y_labels
+        )
+
+        axis.set_xlabel(
+            "EEG channel"
+        )
+
+        axis.set_ylabel(
+            "Motor-imagery class"
+        )
 
     # ----------------------------------------------------------
     # Title
@@ -182,7 +230,7 @@ def plot_csp_channel_relevance(
     else:
         title_suffix = subject
 
-    ax.set_title(
+    fig.suptitle(
         "CSP+LDA channel relevance\n"
         f"({title_suffix})",
         fontsize=15,
@@ -194,7 +242,7 @@ def plot_csp_channel_relevance(
 
     colorbar = fig.colorbar(
         image,
-        ax=ax,
+        ax=axes.tolist(),
         shrink=0.9,
     )
 
@@ -528,6 +576,7 @@ def plot_csp_temporal_relevance(
     subject: str,
     output_dir,
     class_counts: np.ndarray | None = None,
+    temporal_relevance_std: np.ndarray | None = None,
     ymin: float = 0.0,
     ymax: float | None = None,
 ) -> None:
@@ -558,6 +607,18 @@ def plot_csp_temporal_relevance(
             f"{expected_shape}."
         )
 
+    if temporal_relevance_std is not None:
+        temporal_relevance_std = np.asarray(
+            temporal_relevance_std,
+            dtype=np.float64,
+        )
+
+        if temporal_relevance_std.shape != expected_shape:
+            raise ValueError(
+                "temporal_relevance_std must have shape "
+                f"{expected_shape}."
+            )
+
     if times.ndim != 1:
         raise ValueError(
             "times must be one-dimensional."
@@ -587,9 +648,17 @@ def plot_csp_temporal_relevance(
     # ----------------------------------------------------------
 
     if ymax is None:
-        finite_values = temporal_relevance[
-            np.isfinite(
+        scale_values = temporal_relevance
+
+        if temporal_relevance_std is not None:
+            scale_values = (
                 temporal_relevance
+                + temporal_relevance_std
+            )
+
+        finite_values = scale_values[
+            np.isfinite(
+                scale_values
             )
         ]
 
@@ -648,11 +717,48 @@ def plot_csp_temporal_relevance(
                 f"(n={class_counts[class_idx]})"
             )
 
-        ax.plot(
+        line = ax.plot(
             times,
             relevance,
             label=label,
-        )
+        )[0]
+
+        if temporal_relevance_std is not None:
+            relevance_std = temporal_relevance_std[
+                class_idx
+            ]
+
+            std_mask = (
+                np.isfinite(
+                    relevance
+                )
+                & np.isfinite(
+                    relevance_std
+                )
+            )
+
+            if np.any(
+                std_mask
+            ):
+                lower = np.maximum(
+                    relevance[std_mask]
+                    - relevance_std[std_mask],
+                    ymin,
+                )
+
+                upper = (
+                    relevance[std_mask]
+                    + relevance_std[std_mask]
+                )
+
+                ax.fill_between(
+                    times[std_mask],
+                    lower,
+                    upper,
+                    color=line.get_color(),
+                    alpha=0.18,
+                    linewidth=0,
+                )
 
     # ----------------------------------------------------------
     # Axis limits
@@ -758,6 +864,7 @@ def plot_csp_frequency_relevance(
     subject: str,
     output_dir,
     class_counts: np.ndarray | None = None,
+    frequency_relevance_std: np.ndarray | None = None,
     ymin: float = 0.0,
     ymax: float | None = None,
 ) -> None:
@@ -788,6 +895,18 @@ def plot_csp_frequency_relevance(
             f"{expected_shape}."
         )
 
+    if frequency_relevance_std is not None:
+        frequency_relevance_std = np.asarray(
+            frequency_relevance_std,
+            dtype=np.float64,
+        )
+
+        if frequency_relevance_std.shape != expected_shape:
+            raise ValueError(
+                "frequency_relevance_std must have shape "
+                f"{expected_shape}."
+            )
+
     if frequencies.ndim != 1:
         raise ValueError(
             "frequencies must be one-dimensional."
@@ -817,9 +936,17 @@ def plot_csp_frequency_relevance(
     # ----------------------------------------------------------
 
     if ymax is None:
-        finite_values = frequency_relevance[
-            np.isfinite(
+        scale_values = frequency_relevance
+
+        if frequency_relevance_std is not None:
+            scale_values = (
                 frequency_relevance
+                + frequency_relevance_std
+            )
+
+        finite_values = scale_values[
+            np.isfinite(
+                scale_values
             )
         ]
 
@@ -879,7 +1006,7 @@ def plot_csp_frequency_relevance(
                 f"(n={class_counts[class_idx]})"
             )
 
-        ax.plot(
+        line = ax.plot(
             frequencies[
                 finite_mask
             ],
@@ -887,7 +1014,42 @@ def plot_csp_frequency_relevance(
                 finite_mask
             ],
             label=label,
-        )
+        )[0]
+
+        if frequency_relevance_std is not None:
+            relevance_std = frequency_relevance_std[
+                class_idx
+            ]
+
+            std_mask = (
+                finite_mask
+                & np.isfinite(
+                    relevance_std
+                )
+            )
+
+            if np.any(
+                std_mask
+            ):
+                lower = np.maximum(
+                    relevance[std_mask]
+                    - relevance_std[std_mask],
+                    ymin,
+                )
+
+                upper = (
+                    relevance[std_mask]
+                    + relevance_std[std_mask]
+                )
+
+                ax.fill_between(
+                    frequencies[std_mask],
+                    lower,
+                    upper,
+                    color=line.get_color(),
+                    alpha=0.18,
+                    linewidth=0,
+                )
 
     # ----------------------------------------------------------
     # Axes
@@ -1004,6 +1166,7 @@ def plot_csp_topographies(
     output_dir,
     sfreq: float,
     class_counts: np.ndarray | None = None,
+    channel_relevance_std: np.ndarray | None = None,
     vmin: float = 0.0,
     vmax: float | None = None,
 ) -> None:
@@ -1028,6 +1191,18 @@ def plot_csp_topographies(
             "channel_relevance must have shape "
             f"{expected_shape}."
         )
+
+    if channel_relevance_std is not None:
+        channel_relevance_std = np.asarray(
+            channel_relevance_std,
+            dtype=np.float64,
+        )
+
+        if channel_relevance_std.shape != expected_shape:
+            raise ValueError(
+                "channel_relevance_std must have shape "
+                f"{expected_shape}."
+            )
 
     if class_counts is not None:
         class_counts = np.asarray(
@@ -1093,18 +1268,34 @@ def plot_csp_topographies(
     # Figure
     # ----------------------------------------------------------
 
-    fig, axes = plt.subplots(
-        2,
-        2,
-        figsize=(11, 9),
-    )
+    if channel_relevance_std is None:
+        fig, axes = plt.subplots(
+            2,
+            2,
+            figsize=(11, 9),
+        )
 
-    axes = axes.flatten()
+        mean_axes = axes.flatten()
+        std_axes = None
+
+    else:
+        fig, axes = plt.subplots(
+            2,
+            len(class_names),
+            figsize=(4 * len(class_names), 9),
+        )
+
+        axes = np.asarray(
+            axes
+        )
+
+        mean_axes = axes[0]
+        std_axes = axes[1]
 
     for class_idx, class_name in enumerate(
         class_names
     ):
-        ax = axes[class_idx]
+        ax = mean_axes[class_idx]
 
         relevance = (
             channel_relevance[
@@ -1143,6 +1334,31 @@ def plot_csp_topographies(
             fontsize=13,
             pad=10,
         )
+
+        if channel_relevance_std is not None:
+            std_axis = std_axes[class_idx]
+
+            mne.viz.plot_topomap(
+                channel_relevance_std[
+                    class_idx
+                ],
+                info,
+                axes=std_axis,
+                show=False,
+                contours=0,
+                cmap="viridis",
+                vlim=(
+                    vmin,
+                    vmax,
+                ),
+                sensors=True,
+            )
+
+            std_axis.set_title(
+                "SD",
+                fontsize=13,
+                pad=10,
+            )
 
     # ----------------------------------------------------------
     # Title

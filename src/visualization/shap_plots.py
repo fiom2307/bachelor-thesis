@@ -42,6 +42,7 @@ def plot_temporal_relevance(
     subject: int | None,
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
+    temporal_relevance_std: VectorRelevance | None = None,
     ymin: float = 0.0,
     ymax: float | None = None,
 ) -> Figure:
@@ -83,6 +84,20 @@ def plot_temporal_relevance(
                 ],
                 dtype=np.float64,
             )
+
+            if (
+                temporal_relevance_std is not None
+                and class_id in temporal_relevance_std
+            ):
+                relevance = (
+                    relevance
+                    + np.asarray(
+                        temporal_relevance_std[
+                            class_id
+                        ],
+                        dtype=np.float64,
+                    )
+                )
 
             values = relevance[
                 np.isfinite(
@@ -143,14 +158,63 @@ def plot_temporal_relevance(
                 "have the same shape as times."
             )
 
-        axis.plot(
+        line = axis.plot(
             times,
             relevance,
             label=_get_class_title(
                 class_id,
                 trial_counts,
             ),
-        )
+        )[0]
+
+        if (
+            temporal_relevance_std is not None
+            and class_id in temporal_relevance_std
+        ):
+            relevance_std = np.asarray(
+                temporal_relevance_std[
+                    class_id
+                ],
+                dtype=np.float64,
+            )
+
+            if relevance_std.shape != times.shape:
+                raise ValueError(
+                    "Each temporal relevance SD array must "
+                    "have the same shape as times."
+                )
+
+            finite_mask = (
+                np.isfinite(
+                    relevance
+                )
+                & np.isfinite(
+                    relevance_std
+                )
+            )
+
+            if np.any(
+                finite_mask
+            ):
+                lower = np.maximum(
+                    relevance[finite_mask]
+                    - relevance_std[finite_mask],
+                    ymin,
+                )
+
+                upper = (
+                    relevance[finite_mask]
+                    + relevance_std[finite_mask]
+                )
+
+                axis.fill_between(
+                    times[finite_mask],
+                    lower,
+                    upper,
+                    color=line.get_color(),
+                    alpha=0.18,
+                    linewidth=0,
+                )
 
     # ----------------------------------------------------------
     # Shared axis limits
@@ -212,6 +276,7 @@ def plot_frequency_relevance(
     trial_selection: TrialSelection,
     subject: int | None,
     trial_counts: TrialCounts | None = None,
+    frequency_relevance_std: VectorRelevance | None = None,
     ymin: float = 0.0,
     ymax: float | None = None,
 ) -> Figure:
@@ -266,6 +331,20 @@ def plot_frequency_relevance(
                 ],
                 dtype=np.float64,
             )
+
+            if (
+                frequency_relevance_std is not None
+                and class_id in frequency_relevance_std
+            ):
+                relevance = (
+                    relevance
+                    + np.asarray(
+                        frequency_relevance_std[
+                            class_id
+                        ],
+                        dtype=np.float64,
+                    )
+                )
 
             values = relevance[
                 np.isfinite(
@@ -328,7 +407,7 @@ def plot_frequency_relevance(
                 "contain one value per frequency band."
             )
 
-        axis.plot(
+        line = axis.plot(
             x_positions,
             relevance,
             marker="o",
@@ -336,7 +415,58 @@ def plot_frequency_relevance(
                 class_id,
                 trial_counts,
             ),
-        )
+        )[0]
+
+        if (
+            frequency_relevance_std is not None
+            and class_id in frequency_relevance_std
+        ):
+            relevance_std = np.asarray(
+                frequency_relevance_std[
+                    class_id
+                ],
+                dtype=np.float64,
+            )
+
+            if relevance_std.shape != (
+                n_bands,
+            ):
+                raise ValueError(
+                    "Each frequency relevance SD array must "
+                    "contain one value per frequency band."
+                )
+
+            finite_mask = (
+                np.isfinite(
+                    relevance
+                )
+                & np.isfinite(
+                    relevance_std
+                )
+            )
+
+            if np.any(
+                finite_mask
+            ):
+                lower = np.maximum(
+                    relevance[finite_mask]
+                    - relevance_std[finite_mask],
+                    ymin,
+                )
+
+                upper = (
+                    relevance[finite_mask]
+                    + relevance_std[finite_mask]
+                )
+
+                axis.fill_between(
+                    x_positions[finite_mask],
+                    lower,
+                    upper,
+                    color=line.get_color(),
+                    alpha=0.18,
+                    linewidth=0,
+                )
 
     # ----------------------------------------------------------
     # X-axis
@@ -407,6 +537,7 @@ def plot_topographies(
     imagery_window: tuple[float, float] = (0.5, 4.0),
     trial_counts: TrialCounts | None = None,
     show_channel_names: bool = False,
+    topographic_relevance_std: VectorRelevance | None = None,
     vmin: float = 0.0,
     vmax: float | None = None,
 ) -> Figure:
@@ -421,14 +552,31 @@ def plot_topographies(
         class_ids
     )
 
-    figure, axes = plt.subplots(
-        nrows=2,
-        ncols=2,
-        figsize=(12, 10),
-        constrained_layout=True,
-    )
+    if topographic_relevance_std is None:
+        figure, axes = plt.subplots(
+            nrows=2,
+            ncols=2,
+            figsize=(12, 10),
+            constrained_layout=True,
+        )
 
-    axes = axes.ravel()
+        mean_axes = axes.ravel()
+        std_axes = None
+
+    else:
+        figure, axes = plt.subplots(
+            nrows=2,
+            ncols=len(class_ids),
+            figsize=(4 * len(class_ids), 9),
+            constrained_layout=True,
+        )
+
+        axes = np.asarray(
+            axes
+        )
+
+        mean_axes = axes[0]
+        std_axes = axes[1]
 
     if vmax is None:
         vmax = max(
@@ -453,11 +601,13 @@ def plot_topographies(
 
     image = None
 
-    for axis, class_id in zip(
-        axes,
-        class_ids,
-        strict=False,
+    for class_index, class_id in enumerate(
+        class_ids
     ):
+        axis = mean_axes[
+            class_index
+        ]
+
         relevance = topographic_relevance[
             class_id
         ]
@@ -492,15 +642,50 @@ def plot_topographies(
             )
         )
 
-    for axis in axes[
-        len(class_ids):
-    ]:
-        axis.set_visible(False)
+        if topographic_relevance_std is not None:
+            if class_id not in topographic_relevance_std:
+                continue
+
+            std_relevance = topographic_relevance_std[
+                class_id
+            ]
+
+            if len(std_relevance) != len(
+                info.ch_names
+            ):
+                raise ValueError(
+                    "The number of topographic relevance "
+                    "SD values must match the number of "
+                    "channels."
+                )
+
+            std_axis = std_axes[
+                class_index
+            ]
+
+            mne.viz.plot_topomap(
+                data=std_relevance,
+                pos=info,
+                axes=std_axis,
+                show=False,
+                sensors=True,
+                names=channel_names,
+                contours=6,
+                cmap="viridis",
+                vlim=(
+                    vmin,
+                    vmax,
+                ),
+            )
+
+            std_axis.set_title(
+                "SD"
+            )
 
     if image is not None:
         colorbar = figure.colorbar(
             image,
-            ax=axes.tolist(),
+            ax=axes.ravel().tolist(),
             shrink=0.8,
         )
 
@@ -533,6 +718,7 @@ def plot_channel_relevance(
     trial_selection: TrialSelection,
     subject: int | None,
     trial_counts: TrialCounts | None = None,
+    channel_relevance_std: VectorRelevance | None = None,
     vmin: float = 0.0,
     vmax: float | None = None,
 ) -> Figure:
@@ -556,6 +742,22 @@ def plot_channel_relevance(
         ]
         for class_id in class_ids
     ])
+
+    std_matrix = None
+
+    if channel_relevance_std is not None:
+        std_matrix = np.stack([
+            channel_relevance_std[
+                class_id
+            ]
+            for class_id in class_ids
+        ])
+
+        if std_matrix.shape != relevance_matrix.shape:
+            raise ValueError(
+                "channel_relevance_std must match "
+                "channel_relevance shape."
+            )
 
     if relevance_matrix.shape[1] != len(
         channel_names
@@ -592,12 +794,24 @@ def plot_channel_relevance(
     # Figure
     # ----------------------------------------------------------
 
-    figure, axis = plt.subplots(
-        figsize=(15, 5),
+    n_panels = (
+        2
+        if std_matrix is not None
+        else 1
+    )
+
+    figure, axes = plt.subplots(
+        n_panels,
+        1,
+        figsize=(15, 5 * n_panels),
         constrained_layout=True,
     )
 
-    image = axis.imshow(
+    axes = np.atleast_1d(
+        axes
+    )
+
+    image = axes[0].imshow(
         relevance_matrix,
         aspect="auto",
         interpolation="nearest",
@@ -606,53 +820,77 @@ def plot_channel_relevance(
         vmax=vmax,
     )
 
-    axis.set_xticks(
-        np.arange(
-            len(channel_names)
-        )
-    )
-
-    axis.set_xticklabels(
-        channel_names,
-        rotation=45,
-        ha="right",
-    )
-
-    axis.set_yticks(
-        np.arange(
-            len(class_ids)
-        )
-    )
-
-    axis.set_yticklabels([
+    y_labels = [
         _get_class_title(
             class_id,
             trial_counts,
         )
         for class_id in class_ids
-    ])
+    ]
 
-    axis.set_title(
+    if std_matrix is not None:
+        axes[1].imshow(
+            std_matrix,
+            aspect="auto",
+            interpolation="nearest",
+            cmap="viridis",
+            vmin=vmin,
+            vmax=vmax,
+        )
+
+        axes[0].set_title(
+            "Mean"
+        )
+
+        axes[1].set_title(
+            "Standard deviation across subjects"
+        )
+
+    for axis in axes:
+        axis.set_xticks(
+            np.arange(
+                len(channel_names)
+            )
+        )
+
+        axis.set_xticklabels(
+            channel_names,
+            rotation=45,
+            ha="right",
+        )
+
+        axis.set_yticks(
+            np.arange(
+                len(class_ids)
+            )
+        )
+
+        axis.set_yticklabels(
+            y_labels
+        )
+
+        axis.set_xlabel(
+            "EEG channel"
+        )
+
+        axis.set_ylabel(
+            "Motor-imagery class"
+        )
+
+    figure.suptitle(
         _build_title(
             base_title=(
                 "Class-wise EEG channel SHAP relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,
-        )
-    )
-
-    axis.set_xlabel(
-        "EEG channel"
-    )
-
-    axis.set_ylabel(
-        "Motor-imagery class"
+        ),
+        fontsize=15,
     )
 
     colorbar = figure.colorbar(
         image,
-        ax=axis,
+        ax=axes.tolist(),
         shrink=0.9,
     )
 

@@ -862,6 +862,48 @@ def get_frequency_statistical_plot_path(
     )
 
 
+def get_temporal_statistical_analysis_dir() -> Path:
+    """
+    Return the temporal statistical analysis directory.
+    """
+    return _create_directory(
+        STATISTICAL_ANALYSIS_DIR
+        / "temporal"
+    )
+
+
+def get_temporal_statistical_profiles_path() -> Path:
+    """
+    Return the subject-level temporal profile CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "temporal_relevance_profiles.csv"
+    )
+
+
+def get_temporal_statistical_results_path() -> Path:
+    """
+    Return the temporal statistical test CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "temporal_relevance_statistics.csv"
+    )
+
+
+def get_temporal_statistical_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one temporal statistical comparison plot path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / f"{comparison_slug}.png"
+    )
+
+
 def get_csp_lda_time_window_accuracy_plot_path() -> Path:
     """
     Return the CSP+LDA time-window accuracy comparison plot path.

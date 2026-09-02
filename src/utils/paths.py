@@ -23,6 +23,7 @@ SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
 
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
 CSP_PATTERN_ANALYSIS_DIR = RESULTS_DIR / "csp_pattern_analysis"
+STATISTICAL_ANALYSIS_DIR = RESULTS_DIR / "statistical_analysis"
 
 CSP_LDA_EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "csp_lda_experiments"
 
@@ -66,6 +67,7 @@ for directory in (
     SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
     CSP_PATTERN_ANALYSIS_DIR,
+    STATISTICAL_ANALYSIS_DIR,
     CSP_LDA_EXPERIMENT_RESULTS_DIR,
 ):
     directory.mkdir(
@@ -811,6 +813,52 @@ def get_csp_topographies_path(
     return _get_csp_pattern_plot_path(
         plot_type="topographies",
         subject=subject,
+    )
+
+
+# ----------------------------------------------------------------------
+# Statistical analysis paths
+# ----------------------------------------------------------------------
+
+def get_frequency_statistical_analysis_dir() -> Path:
+    """
+    Return the frequency statistical analysis directory.
+    """
+    return _create_directory(
+        STATISTICAL_ANALYSIS_DIR
+        / "frequency"
+    )
+
+
+def get_frequency_statistical_profiles_path() -> Path:
+    """
+    Return the subject-level frequency profile CSV path.
+    """
+    return (
+        get_frequency_statistical_analysis_dir()
+        / "frequency_relevance_profiles.csv"
+    )
+
+
+def get_frequency_statistical_results_path() -> Path:
+    """
+    Return the frequency statistical test CSV path.
+    """
+    return (
+        get_frequency_statistical_analysis_dir()
+        / "frequency_relevance_statistics.csv"
+    )
+
+
+def get_frequency_statistical_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one frequency statistical comparison plot path.
+    """
+    return (
+        get_frequency_statistical_analysis_dir()
+        / f"{comparison_slug}.png"
     )
 
 

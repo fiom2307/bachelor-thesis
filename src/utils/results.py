@@ -144,17 +144,18 @@ def print_accuracy_comparison(
         print("No accuracy results available.")
         return
 
-    print("-" * 70)
+    print("-" * 85)
     print(
         f"{'Subject':<10} "
-        f"{csp_model_name:<20} "
-        f"{'EEGNet':<20} "
+        f"{csp_model_name:<25} "
+        f"{'EEGNet':<25} "
         f"{'Difference':<20}"
     )
-    print("-" * 70)
+    print("-" * 85)
 
     csp_accuracies: list[float] = []
     eegnet_accuracies: list[float] = []
+    differences: list[float] = []
 
     for subject_name, csp_accuracy, eegnet_accuracy in results:
         csp_text = (
@@ -170,23 +171,33 @@ def print_accuracy_comparison(
 
         print(
             f"{subject_name:<10} "
-            f"{csp_text:<20} "
-            f"{eegnet_text:<20} "
+            f"{csp_text:<25} "
+            f"{eegnet_text:<25} "
             f"{difference:<20.4f}"
         )
 
         csp_accuracies.append(csp_accuracy)
         eegnet_accuracies.append(eegnet_accuracy)
+        differences.append(difference)
 
-    mean_csp = (
-        sum(csp_accuracies)
-        / len(csp_accuracies)
+    # Mean across subjects
+    mean_csp = np.mean(csp_accuracies)
+    mean_eegnet = np.mean(eegnet_accuracies)
+    mean_difference = np.mean(differences)
+
+    # Sample standard deviation across subjects
+    std_csp = np.std(
+        csp_accuracies,
+        ddof=1,
     )
-    mean_eegnet = (
-        sum(eegnet_accuracies)
-        / len(eegnet_accuracies)
+    std_eegnet = np.std(
+        eegnet_accuracies,
+        ddof=1,
     )
-    mean_difference = mean_eegnet - mean_csp
+    std_difference = np.std(
+        differences,
+        ddof=1,
+    )
 
     mean_csp_text = (
         f"{mean_csp:.4f} "
@@ -197,12 +208,28 @@ def print_accuracy_comparison(
         f"({mean_eegnet * 100:.1f}%)"
     )
 
-    print("-" * 70)
+    std_csp_text = (
+        f"{std_csp:.4f} "
+        f"({std_csp * 100:.1f}%)"
+    )
+    std_eegnet_text = (
+        f"{std_eegnet:.4f} "
+        f"({std_eegnet * 100:.1f}%)"
+    )
+
+    print("-" * 85)
     print(
         f"{'Mean':<10} "
-        f"{mean_csp_text:<20} "
-        f"{mean_eegnet_text:<20} "
+        f"{mean_csp_text:<25} "
+        f"{mean_eegnet_text:<25} "
         f"{mean_difference:<20.4f}"
+    )
+
+    print(
+        f"{'SD':<10} "
+        f"{std_csp_text:<25} "
+        f"{std_eegnet_text:<25} "
+        f"{std_difference:<20.4f}"
     )
 
 

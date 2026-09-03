@@ -904,6 +904,48 @@ def get_temporal_statistical_plot_path(
     )
 
 
+def get_channel_statistical_analysis_dir() -> Path:
+    """
+    Return the channel statistical analysis directory.
+    """
+    return _create_directory(
+        STATISTICAL_ANALYSIS_DIR
+        / "channel"
+    )
+
+
+def get_channel_statistical_profiles_path() -> Path:
+    """
+    Return the subject-level channel profile CSV path.
+    """
+    return (
+        get_channel_statistical_analysis_dir()
+        / "channel_relevance_profiles.csv"
+    )
+
+
+def get_channel_statistical_results_path() -> Path:
+    """
+    Return the channel statistical test CSV path.
+    """
+    return (
+        get_channel_statistical_analysis_dir()
+        / "channel_relevance_statistics.csv"
+    )
+
+
+def get_channel_statistical_comparison_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one channel statistical comparison plot path.
+    """
+    return (
+        get_channel_statistical_analysis_dir()
+        / f"{comparison_slug}.png"
+    )
+
+
 def get_csp_lda_time_window_accuracy_plot_path() -> Path:
     """
     Return the CSP+LDA time-window accuracy comparison plot path.

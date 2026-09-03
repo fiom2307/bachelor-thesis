@@ -904,6 +904,28 @@ def get_temporal_statistical_plot_path(
     )
 
 
+def get_temporal_classwise_statistical_results_path() -> Path:
+    """
+    Return the class-wise temporal statistical test CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "csp_lda_classwise_correct_vs_incorrect_statistics.csv"
+    )
+
+
+def get_temporal_classwise_statistical_plot_path(
+    class_slug: str,
+) -> Path:
+    """
+    Return one class-wise temporal statistical summary plot path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / f"csp_lda_{class_slug}_correct_vs_incorrect.png"
+    )
+
+
 def get_channel_statistical_analysis_dir() -> Path:
     """
     Return the channel statistical analysis directory.

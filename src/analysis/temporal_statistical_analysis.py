@@ -19,12 +19,13 @@ from src.analysis.shap_analysis import (
     load_time_domain_shap_result,
 )
 from src.data.dataset import get_data_for_subject
-from src.data.labels import CLASS_LABELS
+from src.data.labels import CLASS_LABELS, CLASS_NAMES
 from src.utils.config import EPOCH_TMIN
 from src.utils.paths import (
     get_csp_fold_model_path,
     get_lda_fold_model_path,
     get_subject_name,
+    get_temporal_classwise_statistical_results_path,
     get_temporal_statistical_profiles_path,
     get_temporal_statistical_results_path,
     get_time_domain_shap_values_path,
@@ -100,6 +101,35 @@ class TemporalStatisticRow:
     direction: str
 
 
+@dataclass(frozen=True)
+class SubjectClassTemporalProfile:
+    subject: int
+    class_label: int
+    class_name: str
+    condition: TrialSelection
+    values: np.ndarray
+
+
+@dataclass(frozen=True)
+class ClassTemporalStatisticRow:
+    class_label: int
+    class_name: str
+    temporal_window: str
+    start_time: float
+    end_time: float
+    n: int
+    correct_mean: float
+    correct_std: float
+    incorrect_mean: float
+    incorrect_std: float
+    mean_difference: float
+    wilcoxon_statistic: float
+    p_value: float
+    p_value_fdr: float
+    significant_fdr: bool
+    direction: str
+
+
 COMPARISONS: tuple[
     TemporalComparison,
     ...,
@@ -161,6 +191,29 @@ def run_temporal_statistical_analysis() -> tuple[
     return profiles, rows
 
 
+def run_csp_lda_classwise_temporal_statistical_analysis() -> tuple[
+    list[SubjectClassTemporalProfile],
+    list[ClassTemporalStatisticRow],
+]:
+    """
+    Run the class-wise CSP+LDA correct-vs-incorrect temporal analysis.
+    """
+    profiles = collect_csp_lda_classwise_temporal_profiles()
+    rows = compute_csp_lda_classwise_temporal_statistics(
+        profiles
+    )
+
+    save_csp_lda_classwise_temporal_statistics(
+        rows
+    )
+
+    print_csp_lda_classwise_temporal_statistics(
+        rows
+    )
+
+    return profiles, rows
+
+
 def collect_subject_temporal_profiles() -> list[
     SubjectTemporalProfile
 ]:
@@ -178,6 +231,24 @@ def collect_subject_temporal_profiles() -> list[
 
         profiles.extend(
             _load_eegnet_subject_profiles(
+                subject
+            )
+        )
+
+    return profiles
+
+
+def collect_csp_lda_classwise_temporal_profiles() -> list[
+    SubjectClassTemporalProfile
+]:
+    """
+    Build one normalized temporal-window profile per subject/class.
+    """
+    profiles = []
+
+    for subject in SUBJECTS:
+        profiles.extend(
+            _load_csp_subject_classwise_profiles(
                 subject
             )
         )
@@ -286,6 +357,120 @@ def compute_temporal_statistics(
                     wilcoxon_statistic=(
                         row.wilcoxon_statistic
                     ),
+                    p_value=row.p_value,
+                    p_value_fdr=p_value_fdr,
+                    significant_fdr=bool(
+                        is_significant
+                    ),
+                    direction=row.direction,
+                )
+            )
+
+    return rows
+
+
+def compute_csp_lda_classwise_temporal_statistics(
+    profiles: list[SubjectClassTemporalProfile],
+) -> list[ClassTemporalStatisticRow]:
+    """
+    Compute paired Wilcoxon tests per class/window.
+
+    FDR correction is applied across Early/Middle/Late separately
+    within each class.
+    """
+    profile_lookup = {
+        (
+            profile.subject,
+            profile.class_label,
+            profile.condition,
+        ): profile.values
+        for profile in profiles
+    }
+
+    rows = []
+
+    for class_label, class_name in zip(
+        CLASS_LABELS,
+        CLASS_NAMES,
+        strict=True,
+    ):
+        class_rows = []
+        raw_p_values = []
+        display_name = _display_class_name(
+            class_name
+        )
+
+        for window_index, (window_name, start, end) in enumerate(
+            TEMPORAL_WINDOWS
+        ):
+            incorrect_values, correct_values = (
+                _paired_class_window_values(
+                    profile_lookup=profile_lookup,
+                    class_label=class_label,
+                    window_index=window_index,
+                )
+            )
+
+            differences = (
+                correct_values
+                - incorrect_values
+            )
+
+            statistic, p_value = _paired_wilcoxon(
+                differences
+            )
+
+            raw_p_values.append(
+                p_value
+            )
+
+            class_rows.append(
+                ClassTemporalStatisticRow(
+                    class_label=class_label,
+                    class_name=display_name,
+                    temporal_window=window_name,
+                    start_time=start,
+                    end_time=end,
+                    n=len(differences),
+                    correct_mean=_nanmean(correct_values),
+                    correct_std=_nanstd(correct_values),
+                    incorrect_mean=_nanmean(incorrect_values),
+                    incorrect_std=_nanstd(incorrect_values),
+                    mean_difference=_nanmean(differences),
+                    wilcoxon_statistic=statistic,
+                    p_value=p_value,
+                    p_value_fdr=np.nan,
+                    significant_fdr=False,
+                    direction=_classwise_direction_label(
+                        _nanmean(differences)
+                    ),
+                )
+            )
+
+        corrected_p_values, significant = _fdr_correct(
+            raw_p_values
+        )
+
+        for row, p_value_fdr, is_significant in zip(
+            class_rows,
+            corrected_p_values,
+            significant,
+            strict=True,
+        ):
+            rows.append(
+                ClassTemporalStatisticRow(
+                    class_label=row.class_label,
+                    class_name=row.class_name,
+                    temporal_window=row.temporal_window,
+                    start_time=row.start_time,
+                    end_time=row.end_time,
+                    n=row.n,
+                    correct_mean=row.correct_mean,
+                    correct_std=row.correct_std,
+                    incorrect_mean=row.incorrect_mean,
+                    incorrect_std=row.incorrect_std,
+                    mean_difference=row.mean_difference,
+                    wilcoxon_statistic=row.wilcoxon_statistic,
                     p_value=row.p_value,
                     p_value_fdr=p_value_fdr,
                     significant_fdr=bool(
@@ -436,6 +621,84 @@ def save_temporal_statistics(
     return output_file
 
 
+def save_csp_lda_classwise_temporal_statistics(
+    rows: list[ClassTemporalStatisticRow],
+    output_file: str | Path | None = None,
+) -> Path:
+    """
+    Save class-wise CSP+LDA temporal statistical test results.
+    """
+    if output_file is None:
+        output_file = get_temporal_classwise_statistical_results_path()
+
+    output_file = Path(
+        output_file
+    )
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "comparison",
+                "class_label",
+                "class_name",
+                "temporal_window",
+                "start_time",
+                "end_time",
+                "n",
+                "correct_mean",
+                "correct_std",
+                "incorrect_mean",
+                "incorrect_std",
+                "mean_difference",
+                "wilcoxon_statistic",
+                "p_value",
+                "p_value_fdr",
+                "significant_fdr",
+                "direction",
+            ],
+        )
+
+        writer.writeheader()
+
+        for row in rows:
+            writer.writerow({
+                "comparison": (
+                    "CSP+LDA correct vs incorrect"
+                ),
+                "class_label": row.class_label,
+                "class_name": row.class_name,
+                "temporal_window": row.temporal_window,
+                "start_time": _format_float(row.start_time),
+                "end_time": _format_float(row.end_time),
+                "n": row.n,
+                "correct_mean": _format_float(row.correct_mean),
+                "correct_std": _format_float(row.correct_std),
+                "incorrect_mean": _format_float(
+                    row.incorrect_mean
+                ),
+                "incorrect_std": _format_float(
+                    row.incorrect_std
+                ),
+                "mean_difference": _format_float(
+                    row.mean_difference
+                ),
+                "wilcoxon_statistic": _format_float(
+                    row.wilcoxon_statistic
+                ),
+                "p_value": _format_float(row.p_value),
+                "p_value_fdr": _format_float(row.p_value_fdr),
+                "significant_fdr": row.significant_fdr,
+                "direction": row.direction,
+            })
+
+    return output_file
+
+
 def print_temporal_statistics(
     rows: list[TemporalStatisticRow],
 ) -> None:
@@ -483,6 +746,47 @@ def print_temporal_statistics(
                 f"{row.p_value_fdr:>10.4g}"
                 f"{marker}"
             )
+
+
+def print_csp_lda_classwise_temporal_statistics(
+    rows: list[ClassTemporalStatisticRow],
+) -> None:
+    """
+    Print a compact class-wise temporal summary.
+    """
+    print()
+    print("=" * 70)
+    print("CSP+LDA class-wise correct vs incorrect temporal relevance")
+    print("=" * 70)
+    print(
+        f"{'Class':<12} "
+        f"{'Window':<10} "
+        f"{'n':>2} "
+        f"{'Correct mean+/-SD':<22} "
+        f"{'Incorrect mean+/-SD':<24} "
+        f"{'Delta':>8} "
+        f"{'p':>10} "
+        f"{'p_FDR':>10}"
+    )
+
+    for row in rows:
+        marker = (
+            "*"
+            if row.significant_fdr
+            else ""
+        )
+
+        print(
+            f"{row.class_name:<12} "
+            f"{row.temporal_window:<10} "
+            f"{row.n:>2} "
+            f"{_mean_sd(row.correct_mean, row.correct_std):<22} "
+            f"{_mean_sd(row.incorrect_mean, row.incorrect_std):<24} "
+            f"{row.mean_difference:>8.4f} "
+            f"{row.p_value:>10.4g} "
+            f"{row.p_value_fdr:>10.4g}"
+            f"{marker}"
+        )
 
 
 def _load_csp_subject_profiles(
@@ -540,6 +844,90 @@ def _load_csp_subject_profiles(
                 ),
             )
         )
+
+    return profiles
+
+
+def _load_csp_subject_classwise_profiles(
+    subject: int,
+) -> list[SubjectClassTemporalProfile]:
+    """
+    Compute CSP+LDA temporal profiles without averaging classes.
+    """
+    csps, ldas = _load_subject_models(
+        subject
+    )
+
+    subject_data = get_data_for_subject(
+        subject
+    )
+
+    if subject_data is None:
+        raise FileNotFoundError(
+            "Could not load data for "
+            f"{get_subject_name(subject)}."
+        )
+
+    _, _, x_eval, y_eval = subject_data
+
+    result = compute_trial_temporal_relevance(
+        csps=csps,
+        ldas=ldas,
+        data=x_eval,
+        labels=y_eval,
+    )
+
+    times = _create_times(
+        result.values.shape[1]
+    )
+
+    profiles = []
+
+    for condition, mask in (
+        ("correct", result.correct_mask),
+        ("incorrect", result.incorrect_mask),
+    ):
+        class_relevance, _ = aggregate_trial_temporal_relevance(
+            result=result,
+            mask=mask,
+        )
+
+        relevance_by_class = dict(
+            zip(
+                np.unique(result.labels),
+                class_relevance,
+                strict=True,
+            )
+        )
+
+        for class_label, class_name in zip(
+            CLASS_LABELS,
+            CLASS_NAMES,
+            strict=True,
+        ):
+            class_curve = relevance_by_class.get(
+                class_label,
+                np.full(
+                    result.values.shape[1],
+                    np.nan,
+                    dtype=np.float64,
+                ),
+            )
+
+            profiles.append(
+                SubjectClassTemporalProfile(
+                    subject=subject,
+                    class_label=class_label,
+                    class_name=_display_class_name(
+                        class_name
+                    ),
+                    condition=condition,
+                    values=_single_class_temporal_profile(
+                        class_curve,
+                        times,
+                    ),
+                )
+            )
 
     return profiles
 
@@ -856,6 +1244,96 @@ def _class_balanced_temporal_profile(
     )
 
 
+def _single_class_temporal_profile(
+    class_relevance: np.ndarray,
+    times: np.ndarray,
+) -> np.ndarray:
+    """
+    Area-normalize one class curve, then average temporal windows.
+    """
+    class_relevance = np.asarray(
+        class_relevance,
+        dtype=np.float64,
+    )
+
+    times = np.asarray(
+        times,
+        dtype=np.float64,
+    )
+
+    if not np.any(
+        np.isfinite(
+            class_relevance
+        )
+    ):
+        return np.full(
+            len(TEMPORAL_WINDOWS),
+            np.nan,
+            dtype=np.float64,
+        )
+
+    normalization_mask = (
+        (times >= NORMALIZATION_WINDOW[0])
+        & (times <= NORMALIZATION_WINDOW[1])
+    )
+
+    denominator = np.trapezoid(
+        class_relevance[
+            normalization_mask
+        ],
+        times[
+            normalization_mask
+        ],
+    )
+
+    if (
+        not np.isfinite(
+            denominator
+        )
+        or denominator <= 0
+    ):
+        return np.full(
+            len(TEMPORAL_WINDOWS),
+            np.nan,
+            dtype=np.float64,
+        )
+
+    normalized_curve = (
+        class_relevance
+        / denominator
+    )
+
+    window_values = np.full(
+        len(TEMPORAL_WINDOWS),
+        np.nan,
+        dtype=np.float64,
+    )
+
+    for window_index, (_, start, end) in enumerate(
+        TEMPORAL_WINDOWS
+    ):
+        if window_index == len(TEMPORAL_WINDOWS) - 1:
+            window_mask = (
+                (times >= start)
+                & (times <= end)
+            )
+        else:
+            window_mask = (
+                (times >= start)
+                & (times < end)
+            )
+
+        window_values[
+            window_index
+        ] = np.nanmean(
+            normalized_curve[
+                window_mask
+            ]
+        )
+
+    return window_values
+
+
 def _create_times(
     n_times: int,
 ) -> np.ndarray:
@@ -932,6 +1410,71 @@ def _paired_window_values(
         ),
         np.asarray(
             right_values,
+            dtype=np.float64,
+        ),
+    )
+
+
+def _paired_class_window_values(
+    profile_lookup: dict[
+        tuple[int, int, TrialSelection],
+        np.ndarray,
+    ],
+    class_label: int,
+    window_index: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Return paired incorrect/correct values for one class/window.
+    """
+    incorrect_values = []
+    correct_values = []
+
+    for subject in SUBJECTS:
+        incorrect_profile = profile_lookup.get((
+            subject,
+            class_label,
+            "incorrect",
+        ))
+
+        correct_profile = profile_lookup.get((
+            subject,
+            class_label,
+            "correct",
+        ))
+
+        if (
+            incorrect_profile is None
+            or correct_profile is None
+        ):
+            continue
+
+        incorrect_value = incorrect_profile[
+            window_index
+        ]
+        correct_value = correct_profile[
+            window_index
+        ]
+
+        if not (
+            np.isfinite(incorrect_value)
+            and np.isfinite(correct_value)
+        ):
+            continue
+
+        incorrect_values.append(
+            incorrect_value
+        )
+        correct_values.append(
+            correct_value
+        )
+
+    return (
+        np.asarray(
+            incorrect_values,
+            dtype=np.float64,
+        ),
+        np.asarray(
+            correct_values,
             dtype=np.float64,
         ),
     )
@@ -1045,6 +1588,32 @@ def _direction_label(
         f"{operator} "
         f"{comparison.left_label}"
     )
+
+
+def _classwise_direction_label(
+    mean_difference: float,
+) -> str:
+    """
+    Build a readable direction for CSP correct - CSP incorrect.
+    """
+    if not np.isfinite(
+        mean_difference
+    ):
+        return "not available"
+
+    if mean_difference > 0:
+        return "CSP correct > CSP incorrect"
+
+    if mean_difference < 0:
+        return "CSP correct < CSP incorrect"
+
+    return "CSP correct = CSP incorrect"
+
+
+def _display_class_name(
+    class_name: str,
+) -> str:
+    return class_name.title()
 
 
 def _nanmean(

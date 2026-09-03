@@ -946,6 +946,46 @@ def get_channel_statistical_comparison_plot_path(
     )
 
 
+def get_performance_statistical_analysis_dir() -> Path:
+    """
+    Return the performance statistical analysis directory.
+    """
+    return _create_directory(
+        STATISTICAL_ANALYSIS_DIR
+        / "performance"
+    )
+
+
+def get_performance_accuracy_statistics_path() -> Path:
+    """
+    Return the overall accuracy statistical test CSV path.
+    """
+    return (
+        get_performance_statistical_analysis_dir()
+        / "accuracy_statistics.csv"
+    )
+
+
+def get_performance_class_recall_profiles_path() -> Path:
+    """
+    Return the subject-level class recall profile CSV path.
+    """
+    return (
+        get_performance_statistical_analysis_dir()
+        / "class_recall_profiles.csv"
+    )
+
+
+def get_performance_class_recall_statistics_path() -> Path:
+    """
+    Return the class-wise recall statistical test CSV path.
+    """
+    return (
+        get_performance_statistical_analysis_dir()
+        / "class_recall_statistics.csv"
+    )
+
+
 def get_csp_lda_time_window_accuracy_plot_path() -> Path:
     """
     Return the CSP+LDA time-window accuracy comparison plot path.

@@ -1088,3 +1088,54 @@ def get_csp_lda_n_components_accuracy_plot_path() -> Path:
         CSP_LDA_EXPERIMENT_RESULTS_DIR
         / "n_components_accuracy_comparison.png"
     )
+
+
+def get_csp_lda_temporal_segmented_results_dir() -> Path:
+    """
+    Return the CSP+LDA temporal-segmented experiment results directory.
+    """
+    return _create_directory(
+        CSP_LDA_EXPERIMENT_RESULTS_DIR
+        / "temporal_segmented"
+    )
+
+
+def get_csp_lda_temporal_segmented_subject_results_path() -> Path:
+    """
+    Return the temporal-segmented CSP+LDA subject-wise results CSV path.
+    """
+    return (
+        get_csp_lda_temporal_segmented_results_dir()
+        / "subject_wise_results.csv"
+    )
+
+
+def get_csp_lda_temporal_segmented_class_summary_path() -> Path:
+    """
+    Return the temporal-segmented CSP+LDA class-wise summary CSV path.
+    """
+    return (
+        get_csp_lda_temporal_segmented_results_dir()
+        / "class_wise_summary.csv"
+    )
+
+
+def get_csp_lda_temporal_segmented_classification_report_path() -> Path:
+    """
+    Return the temporal-segmented CSP+LDA pooled report text path.
+    """
+    return (
+        get_csp_lda_temporal_segmented_results_dir()
+        / "pooled_classification_report.txt"
+    )
+
+
+def get_csp_lda_temporal_segmented_confusion_matrix_path() -> Path:
+    """
+    Return the temporal-segmented CSP+LDA pooled confusion matrices CSV path.
+    """
+    return (
+        get_csp_lda_temporal_segmented_results_dir()
+        / "pooled_confusion_matrices.csv"
+    )
+

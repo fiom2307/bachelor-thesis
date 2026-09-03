@@ -28,6 +28,7 @@ N_COMPONENTS_LIST = [
     8,
     10,
     12,
+    28,
 ]
 
 

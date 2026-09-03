@@ -29,6 +29,8 @@ from src.utils.paths import (
     get_subject_name,
     get_temporal_classwise_csp_vs_eegnet_correct_results_path,
     get_temporal_classwise_statistical_results_path,
+    get_temporal_csp_lda_right_hand_early_late_gee_results_path,
+    get_temporal_csp_lda_right_hand_early_late_gee_trials_path,
     get_temporal_left_hand_early_gee_results_path,
     get_temporal_left_hand_early_gee_trials_path,
     get_temporal_statistical_profiles_path,
@@ -54,6 +56,7 @@ SFREQ = 250.0
 ALPHA = 0.05
 NORMALIZATION_WINDOW = (0.5, 4.0)
 LEFT_HAND_LABEL = 0
+RIGHT_HAND_LABEL = 1
 
 TEMPORAL_WINDOWS: tuple[
     tuple[str, float, float],
@@ -184,6 +187,32 @@ class LeftHandEarlyRelevanceGeeRow:
     p_value: float
     n_subjects: int
     n_left_hand_trials: int
+    interpretation: str
+
+
+@dataclass(frozen=True)
+class CspLdaRightHandEarlyLateContrastGeeTrial:
+    subject: int
+    trial_index: int
+    early_relevance: float
+    late_relevance: float
+    early_late_contrast: float
+    correct: int
+
+
+@dataclass(frozen=True)
+class CspLdaRightHandEarlyLateContrastGeeRow:
+    analysis: str
+    model: str
+    predictor: str
+    coefficient: float
+    standard_error: float
+    odds_ratio: float
+    odds_ratio_ci_low: float
+    odds_ratio_ci_high: float
+    p_value: float
+    n_subjects: int
+    n_right_hand_trials: int
     interpretation: str
 
 
@@ -320,6 +349,32 @@ def run_left_hand_early_relevance_gee_analysis() -> tuple[
     return trials, row
 
 
+def run_csp_lda_right_hand_early_late_gee_analysis() -> tuple[
+    list[CspLdaRightHandEarlyLateContrastGeeTrial],
+    list[CspLdaRightHandEarlyLateContrastGeeRow],
+]:
+    """
+    Run CSP+LDA Right-Hand Early/Late follow-up GEE models.
+    """
+    trials = collect_csp_lda_right_hand_early_late_gee_trials()
+    rows = fit_csp_lda_right_hand_early_late_gee_models(
+        trials
+    )
+
+    save_csp_lda_right_hand_early_late_gee_trials(
+        trials
+    )
+    save_csp_lda_right_hand_early_late_gee_results(
+        rows
+    )
+
+    print_csp_lda_right_hand_early_late_gee_results(
+        rows
+    )
+
+    return trials, rows
+
+
 def collect_subject_temporal_profiles() -> list[
     SubjectTemporalProfile
 ]:
@@ -399,6 +454,24 @@ def collect_left_hand_early_relevance_trials() -> list[
     for subject in SUBJECTS:
         trials.extend(
             _load_left_hand_early_relevance_trials_for_subject(
+                subject
+            )
+        )
+
+    return trials
+
+
+def collect_csp_lda_right_hand_early_late_gee_trials() -> list[
+    CspLdaRightHandEarlyLateContrastGeeTrial
+]:
+    """
+    Compute normalized Early/Late contrast for each CSP+LDA Right-Hand trial.
+    """
+    trials = []
+
+    for subject in SUBJECTS:
+        trials.extend(
+            _load_csp_lda_right_hand_early_late_gee_trials_for_subject(
                 subject
             )
         )
@@ -860,6 +933,168 @@ def fit_left_hand_early_relevance_gee(
     )
 
 
+def fit_csp_lda_right_hand_early_late_gee_models(
+    trials: list[CspLdaRightHandEarlyLateContrastGeeTrial],
+) -> list[CspLdaRightHandEarlyLateContrastGeeRow]:
+    """
+    Fit Right-Hand CSP+LDA contrast, Early-only, and Late-only GEE models.
+    """
+    return [
+        _fit_csp_lda_right_hand_single_predictor_gee(
+            trials=trials,
+            model_label="Early-over-Late contrast GEE",
+            predictor_name="early_late_contrast",
+            interpretation_fn=(
+                _csp_lda_right_hand_early_late_gee_interpretation
+            ),
+        ),
+        _fit_csp_lda_right_hand_single_predictor_gee(
+            trials=trials,
+            model_label="Early-only GEE",
+            predictor_name="early_relevance",
+            interpretation_fn=(
+                _csp_lda_right_hand_early_only_gee_interpretation
+            ),
+        ),
+        _fit_csp_lda_right_hand_single_predictor_gee(
+            trials=trials,
+            model_label="Late-only GEE",
+            predictor_name="late_relevance",
+            interpretation_fn=(
+                _csp_lda_right_hand_late_only_gee_interpretation
+            ),
+        ),
+    ]
+
+
+def _fit_csp_lda_right_hand_single_predictor_gee(
+    trials: list[CspLdaRightHandEarlyLateContrastGeeTrial],
+    model_label: str,
+    predictor_name: str,
+    interpretation_fn,
+) -> CspLdaRightHandEarlyLateContrastGeeRow:
+    """
+    Fit one CSP+LDA Right-Hand binomial GEE model by subject.
+    """
+    finite_trials = [
+        trial
+        for trial in trials
+        if np.isfinite(
+            getattr(
+                trial,
+                predictor_name,
+            )
+        )
+    ]
+
+    if not finite_trials:
+        raise ValueError(
+            "No finite CSP+LDA Right-Hand Early/Late contrast trials "
+            "are available."
+        )
+
+    correct = np.asarray(
+        [
+            trial.correct
+            for trial in finite_trials
+        ],
+        dtype=np.float64,
+    )
+
+    if len(np.unique(correct)) < 2:
+        raise ValueError(
+            "GEE requires both correct and incorrect CSP+LDA "
+            "Right-Hand trials."
+        )
+
+    predictor_values = np.asarray(
+        [
+            getattr(
+                trial,
+                predictor_name,
+            )
+            for trial in finite_trials
+        ],
+        dtype=np.float64,
+    )
+    groups = np.asarray(
+        [
+            trial.subject
+            for trial in finite_trials
+        ]
+    )
+
+    predictors = sm.add_constant(
+        predictor_values
+    )
+
+    model = sm.GEE(
+        endog=correct,
+        exog=predictors,
+        groups=groups,
+        family=sm.families.Binomial(),
+        cov_struct=Exchangeable(),
+    )
+
+    result = model.fit()
+    confidence_interval = np.asarray(
+        result.conf_int()
+    )
+
+    coefficient = float(
+        result.params[1]
+    )
+    standard_error = float(
+        result.bse[1]
+    )
+    p_value = float(
+        result.pvalues[1]
+    )
+    odds_ratio_ci_low = float(
+        np.exp(
+            confidence_interval[1, 0]
+        )
+    )
+    odds_ratio_ci_high = float(
+        np.exp(
+            confidence_interval[1, 1]
+        )
+    )
+
+    return CspLdaRightHandEarlyLateContrastGeeRow(
+        analysis=model_label,
+        model=(
+            "correct ~ "
+            f"{predictor_name}"
+        ),
+        predictor=predictor_name,
+        coefficient=coefficient,
+        standard_error=standard_error,
+        odds_ratio=float(
+            np.exp(
+                coefficient
+            )
+        ),
+        odds_ratio_ci_low=odds_ratio_ci_low,
+        odds_ratio_ci_high=odds_ratio_ci_high,
+        p_value=p_value,
+        n_subjects=len(
+            np.unique(
+                groups
+            )
+        ),
+        n_right_hand_trials=len(
+            finite_trials
+        ),
+        interpretation=(
+            interpretation_fn(
+                coefficient,
+                p_value,
+            )
+        ),
+    )
+
+
 def save_temporal_profiles(
     profiles: list[SubjectTemporalProfile],
     output_file: str | Path | None = None,
@@ -1269,6 +1504,133 @@ def save_left_hand_early_relevance_gee_results(
     return output_file
 
 
+def save_csp_lda_right_hand_early_late_gee_trials(
+    trials: list[CspLdaRightHandEarlyLateContrastGeeTrial],
+    output_file: str | Path | None = None,
+) -> Path:
+    """
+    Save trial-level CSP+LDA Right-Hand Early/Late contrast values.
+    """
+    if output_file is None:
+        output_file = (
+            get_temporal_csp_lda_right_hand_early_late_gee_trials_path()
+        )
+
+    output_file = Path(
+        output_file
+    )
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.writer(
+            file
+        )
+
+        writer.writerow([
+            "subject",
+            "trial_index",
+            "early_relevance",
+            "late_relevance",
+            "early_late_contrast",
+            "correct",
+        ])
+
+        for trial in trials:
+            writer.writerow([
+                get_subject_name(
+                    trial.subject
+                ),
+                trial.trial_index,
+                _format_float(
+                    trial.early_relevance
+                ),
+                _format_float(
+                    trial.late_relevance
+                ),
+                _format_float(
+                    trial.early_late_contrast
+                ),
+                trial.correct,
+            ])
+
+    return output_file
+
+
+def save_csp_lda_right_hand_early_late_gee_results(
+    rows: list[CspLdaRightHandEarlyLateContrastGeeRow],
+    output_file: str | Path | None = None,
+) -> Path:
+    """
+    Save the CSP+LDA Right-Hand Early/Late GEE results.
+    """
+    if output_file is None:
+        output_file = (
+            get_temporal_csp_lda_right_hand_early_late_gee_results_path()
+        )
+
+    output_file = Path(
+        output_file
+    )
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "analysis",
+                "model",
+                "predictor",
+                "coefficient",
+                "standard_error",
+                "odds_ratio",
+                "odds_ratio_ci_low",
+                "odds_ratio_ci_high",
+                "p_value",
+                "n_subjects",
+                "n_right_hand_trials",
+                "interpretation",
+            ],
+        )
+
+        writer.writeheader()
+
+        for row in rows:
+            writer.writerow({
+                "analysis": row.analysis,
+                "model": row.model,
+                "predictor": row.predictor,
+                "coefficient": _format_float(
+                    row.coefficient
+                ),
+                "standard_error": _format_float(
+                    row.standard_error
+                ),
+                "odds_ratio": _format_float(
+                    row.odds_ratio
+                ),
+                "odds_ratio_ci_low": _format_float(
+                    row.odds_ratio_ci_low
+                ),
+                "odds_ratio_ci_high": _format_float(
+                    row.odds_ratio_ci_high
+                ),
+                "p_value": _format_float(
+                    row.p_value
+                ),
+                "n_subjects": row.n_subjects,
+                "n_right_hand_trials": row.n_right_hand_trials,
+                "interpretation": row.interpretation,
+            })
+
+    return output_file
+
+
 def print_temporal_statistics(
     rows: list[TemporalStatisticRow],
 ) -> None:
@@ -1429,6 +1791,36 @@ def print_left_hand_early_relevance_gee_results(
     )
 
 
+def print_csp_lda_right_hand_early_late_gee_results(
+    rows: list[CspLdaRightHandEarlyLateContrastGeeRow],
+) -> None:
+    """
+    Print concise CSP+LDA Right-Hand GEE model summaries.
+    """
+    for row in rows:
+        print()
+        print("=" * 70)
+        print(f"CSP+LDA Right Hand {row.analysis}")
+        print("=" * 70)
+        print(
+            f"{row.model} "
+            f"(subjects={row.n_subjects}, "
+            f"trials={row.n_right_hand_trials})"
+        )
+        print(
+            f"coefficient={row.coefficient:.4g}, "
+            f"SE={row.standard_error:.4g}, "
+            f"OR={row.odds_ratio:.4g}, "
+            "95% OR CI="
+            f"[{row.odds_ratio_ci_low:.4g}, "
+            f"{row.odds_ratio_ci_high:.4g}], "
+            f"p={row.p_value:.4g}"
+        )
+        print(
+            row.interpretation
+        )
+
+
 def _load_csp_subject_profiles(
     subject: int,
 ) -> list[SubjectTemporalProfile]:
@@ -1551,6 +1943,90 @@ def _load_left_hand_early_relevance_trials_for_subject(
                         trial_index
                     ]
                     == LEFT_HAND_LABEL
+                ),
+            )
+        )
+
+    return trials
+
+
+def _load_csp_lda_right_hand_early_late_gee_trials_for_subject(
+    subject: int,
+) -> list[CspLdaRightHandEarlyLateContrastGeeTrial]:
+    """
+    Compute trial-level Early/Late contrast for true Right-Hand CSP+LDA trials.
+    """
+    csps, ldas = _load_subject_models(
+        subject
+    )
+
+    subject_data = get_data_for_subject(
+        subject
+    )
+
+    if subject_data is None:
+        raise FileNotFoundError(
+            "Could not load data for "
+            f"{get_subject_name(subject)}."
+        )
+
+    _, _, x_eval, y_eval = subject_data
+
+    result = compute_trial_temporal_relevance(
+        csps=csps,
+        ldas=ldas,
+        data=x_eval,
+        labels=y_eval,
+    )
+
+    times = _create_times(
+        result.values.shape[1]
+    )
+
+    right_hand_indices = np.flatnonzero(
+        result.labels == RIGHT_HAND_LABEL
+    )
+
+    trials = []
+
+    for trial_index in right_hand_indices:
+        curve = result.values[
+            trial_index
+        ]
+        early_relevance = (
+            _single_trial_normalized_temporal_window_value(
+                curve,
+                times=times,
+                start=0.5,
+                end=1.5,
+            )
+        )
+        late_relevance = (
+            _single_trial_normalized_temporal_window_value(
+                curve,
+                times=times,
+                start=2.5,
+                end=4.0,
+            )
+        )
+
+        trials.append(
+            CspLdaRightHandEarlyLateContrastGeeTrial(
+                subject=subject,
+                trial_index=int(
+                    trial_index
+                ),
+                early_relevance=early_relevance,
+                late_relevance=late_relevance,
+                early_late_contrast=(
+                    early_relevance
+                    - late_relevance
+                ),
+                correct=int(
+                    result.predictions[
+                        trial_index
+                    ]
+                    == RIGHT_HAND_LABEL
                 ),
             )
         )
@@ -2597,6 +3073,79 @@ def _left_hand_early_gee_interpretation(
     return (
         "There is insufficient evidence that early temporal relevance "
         "is associated with correct Left Hand classification."
+    )
+
+
+def _csp_lda_right_hand_early_late_gee_interpretation(
+    coefficient: float,
+    p_value: float,
+) -> str:
+    """
+    Interpret the CSP+LDA Right-Hand Early/Late contrast GEE coefficient.
+    """
+    if (
+        np.isfinite(coefficient)
+        and np.isfinite(p_value)
+        and coefficient > 0
+        and p_value < ALPHA
+    ):
+        return (
+            "CSP+LDA Right Hand trials with relatively higher Early "
+            "and lower Late relevance are more likely to be classified "
+            "correctly."
+        )
+
+    return (
+        "There is insufficient evidence that this temporal pattern is "
+        "associated with CSP+LDA Right Hand correctness."
+    )
+
+
+def _csp_lda_right_hand_early_only_gee_interpretation(
+    coefficient: float,
+    p_value: float,
+) -> str:
+    """
+    Interpret the CSP+LDA Right-Hand Early-only GEE coefficient.
+    """
+    if (
+        np.isfinite(coefficient)
+        and np.isfinite(p_value)
+        and coefficient > 0
+        and p_value < ALPHA
+    ):
+        return (
+            "Greater Early relevance is associated with a higher "
+            "probability of correct CSP+LDA Right Hand classification."
+        )
+
+    return (
+        "There is insufficient evidence that Early relevance is "
+        "associated with correct CSP+LDA Right Hand classification."
+    )
+
+
+def _csp_lda_right_hand_late_only_gee_interpretation(
+    coefficient: float,
+    p_value: float,
+) -> str:
+    """
+    Interpret the CSP+LDA Right-Hand Late-only GEE coefficient.
+    """
+    if (
+        np.isfinite(coefficient)
+        and np.isfinite(p_value)
+        and coefficient < 0
+        and p_value < ALPHA
+    ):
+        return (
+            "Greater Late relevance is associated with a lower "
+            "probability of correct CSP+LDA Right Hand classification."
+        )
+
+    return (
+        "There is insufficient evidence that Late relevance is "
+        "associated with correct CSP+LDA Right Hand classification."
     )
 
 

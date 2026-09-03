@@ -968,6 +968,26 @@ def get_temporal_left_hand_early_gee_results_path() -> Path:
     )
 
 
+def get_temporal_csp_lda_right_hand_early_late_gee_trials_path() -> Path:
+    """
+    Return the CSP+LDA Right-Hand Early/Late contrast GEE trials CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "csp_lda_right_hand_early_late_contrast_gee_trials.csv"
+    )
+
+
+def get_temporal_csp_lda_right_hand_early_late_gee_results_path() -> Path:
+    """
+    Return the CSP+LDA Right-Hand Early/Late contrast GEE result CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "csp_lda_right_hand_early_late_contrast_gee_results.csv"
+    )
+
+
 def get_channel_statistical_analysis_dir() -> Path:
     """
     Return the channel statistical analysis directory.

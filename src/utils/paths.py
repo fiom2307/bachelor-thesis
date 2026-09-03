@@ -926,6 +926,28 @@ def get_temporal_classwise_statistical_plot_path(
     )
 
 
+def get_temporal_classwise_csp_vs_eegnet_correct_results_path() -> Path:
+    """
+    Return the class-wise CSP+LDA vs EEGNet correct-trial CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "classwise_csp_lda_correct_vs_eegnet_correct_statistics.csv"
+    )
+
+
+def get_temporal_classwise_csp_vs_eegnet_correct_plot_path(
+    class_slug: str,
+) -> Path:
+    """
+    Return one class-wise CSP+LDA vs EEGNet correct-trial plot path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / f"classwise_{class_slug}_csp_lda_correct_vs_eegnet_correct.png"
+    )
+
+
 def get_channel_statistical_analysis_dir() -> Path:
     """
     Return the channel statistical analysis directory.

@@ -25,6 +25,7 @@ from src.utils.paths import (
     get_csp_fold_model_path,
     get_lda_fold_model_path,
     get_subject_name,
+    get_temporal_classwise_csp_vs_eegnet_correct_results_path,
     get_temporal_classwise_statistical_results_path,
     get_temporal_statistical_profiles_path,
     get_temporal_statistical_results_path,
@@ -111,6 +112,16 @@ class SubjectClassTemporalProfile:
 
 
 @dataclass(frozen=True)
+class SubjectModelClassTemporalProfile:
+    subject: int
+    model: ModelName
+    class_label: int
+    class_name: str
+    condition: TrialSelection
+    values: np.ndarray
+
+
+@dataclass(frozen=True)
 class ClassTemporalStatisticRow:
     class_label: int
     class_name: str
@@ -122,6 +133,26 @@ class ClassTemporalStatisticRow:
     correct_std: float
     incorrect_mean: float
     incorrect_std: float
+    mean_difference: float
+    wilcoxon_statistic: float
+    p_value: float
+    p_value_fdr: float
+    significant_fdr: bool
+    direction: str
+
+
+@dataclass(frozen=True)
+class ClassModelTemporalStatisticRow:
+    class_label: int
+    class_name: str
+    temporal_window: str
+    start_time: float
+    end_time: float
+    n: int
+    csp_correct_mean: float
+    csp_correct_std: float
+    eegnet_correct_mean: float
+    eegnet_correct_std: float
     mean_difference: float
     wilcoxon_statistic: float
     p_value: float
@@ -214,6 +245,29 @@ def run_csp_lda_classwise_temporal_statistical_analysis() -> tuple[
     return profiles, rows
 
 
+def run_classwise_csp_lda_vs_eegnet_correct_temporal_analysis() -> tuple[
+    list[SubjectModelClassTemporalProfile],
+    list[ClassModelTemporalStatisticRow],
+]:
+    """
+    Run class-wise CSP+LDA correct vs EEGNet correct temporal analysis.
+    """
+    profiles = collect_classwise_model_correct_temporal_profiles()
+    rows = compute_classwise_csp_lda_vs_eegnet_correct_statistics(
+        profiles
+    )
+
+    save_classwise_csp_lda_vs_eegnet_correct_statistics(
+        rows
+    )
+
+    print_classwise_csp_lda_vs_eegnet_correct_statistics(
+        rows
+    )
+
+    return profiles, rows
+
+
 def collect_subject_temporal_profiles() -> list[
     SubjectTemporalProfile
 ]:
@@ -250,6 +304,32 @@ def collect_csp_lda_classwise_temporal_profiles() -> list[
         profiles.extend(
             _load_csp_subject_classwise_profiles(
                 subject
+            )
+        )
+
+    return profiles
+
+
+def collect_classwise_model_correct_temporal_profiles() -> list[
+    SubjectModelClassTemporalProfile
+]:
+    """
+    Build class-wise correct-trial profiles for CSP+LDA and EEGNet.
+    """
+    profiles = []
+
+    for subject in SUBJECTS:
+        profiles.extend(
+            _load_csp_subject_model_classwise_profiles(
+                subject,
+                condition="correct",
+            )
+        )
+
+        profiles.extend(
+            _load_eegnet_subject_model_classwise_profiles(
+                subject,
+                condition="correct",
             )
         )
 
@@ -483,6 +563,124 @@ def compute_csp_lda_classwise_temporal_statistics(
     return rows
 
 
+def compute_classwise_csp_lda_vs_eegnet_correct_statistics(
+    profiles: list[SubjectModelClassTemporalProfile],
+) -> list[ClassModelTemporalStatisticRow]:
+    """
+    Compute class-wise paired CSP+LDA correct vs EEGNet correct tests.
+
+    FDR correction is applied across Early/Middle/Late separately
+    within each class.
+    """
+    profile_lookup = {
+        (
+            profile.subject,
+            profile.model,
+            profile.class_label,
+            profile.condition,
+        ): profile.values
+        for profile in profiles
+    }
+
+    rows = []
+
+    for class_label, class_name in zip(
+        CLASS_LABELS,
+        CLASS_NAMES,
+        strict=True,
+    ):
+        class_rows = []
+        raw_p_values = []
+        display_name = _display_class_name(
+            class_name
+        )
+
+        for window_index, (window_name, start, end) in enumerate(
+            TEMPORAL_WINDOWS
+        ):
+            csp_values, eegnet_values = (
+                _paired_model_class_window_values(
+                    profile_lookup=profile_lookup,
+                    class_label=class_label,
+                    window_index=window_index,
+                    condition="correct",
+                )
+            )
+
+            differences = (
+                eegnet_values
+                - csp_values
+            )
+
+            statistic, p_value = _paired_wilcoxon(
+                differences
+            )
+
+            raw_p_values.append(
+                p_value
+            )
+
+            class_rows.append(
+                ClassModelTemporalStatisticRow(
+                    class_label=class_label,
+                    class_name=display_name,
+                    temporal_window=window_name,
+                    start_time=start,
+                    end_time=end,
+                    n=len(differences),
+                    csp_correct_mean=_nanmean(csp_values),
+                    csp_correct_std=_nanstd(csp_values),
+                    eegnet_correct_mean=_nanmean(eegnet_values),
+                    eegnet_correct_std=_nanstd(eegnet_values),
+                    mean_difference=_nanmean(differences),
+                    wilcoxon_statistic=statistic,
+                    p_value=p_value,
+                    p_value_fdr=np.nan,
+                    significant_fdr=False,
+                    direction=(
+                        _classwise_model_direction_label(
+                            _nanmean(differences)
+                        )
+                    ),
+                )
+            )
+
+        corrected_p_values, significant = _fdr_correct(
+            raw_p_values
+        )
+
+        for row, p_value_fdr, is_significant in zip(
+            class_rows,
+            corrected_p_values,
+            significant,
+            strict=True,
+        ):
+            rows.append(
+                ClassModelTemporalStatisticRow(
+                    class_label=row.class_label,
+                    class_name=row.class_name,
+                    temporal_window=row.temporal_window,
+                    start_time=row.start_time,
+                    end_time=row.end_time,
+                    n=row.n,
+                    csp_correct_mean=row.csp_correct_mean,
+                    csp_correct_std=row.csp_correct_std,
+                    eegnet_correct_mean=row.eegnet_correct_mean,
+                    eegnet_correct_std=row.eegnet_correct_std,
+                    mean_difference=row.mean_difference,
+                    wilcoxon_statistic=row.wilcoxon_statistic,
+                    p_value=row.p_value,
+                    p_value_fdr=p_value_fdr,
+                    significant_fdr=bool(
+                        is_significant
+                    ),
+                    direction=row.direction,
+                )
+            )
+
+    return rows
+
+
 def save_temporal_profiles(
     profiles: list[SubjectTemporalProfile],
     output_file: str | Path | None = None,
@@ -699,6 +897,90 @@ def save_csp_lda_classwise_temporal_statistics(
     return output_file
 
 
+def save_classwise_csp_lda_vs_eegnet_correct_statistics(
+    rows: list[ClassModelTemporalStatisticRow],
+    output_file: str | Path | None = None,
+) -> Path:
+    """
+    Save class-wise CSP+LDA correct vs EEGNet correct test results.
+    """
+    if output_file is None:
+        output_file = (
+            get_temporal_classwise_csp_vs_eegnet_correct_results_path()
+        )
+
+    output_file = Path(
+        output_file
+    )
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "comparison",
+                "class_label",
+                "class_name",
+                "temporal_window",
+                "start_time",
+                "end_time",
+                "n",
+                "csp_correct_mean",
+                "csp_correct_std",
+                "eegnet_correct_mean",
+                "eegnet_correct_std",
+                "mean_difference",
+                "wilcoxon_statistic",
+                "p_value",
+                "p_value_fdr",
+                "significant_fdr",
+                "direction",
+            ],
+        )
+
+        writer.writeheader()
+
+        for row in rows:
+            writer.writerow({
+                "comparison": (
+                    "CSP+LDA correct vs EEGNet correct"
+                ),
+                "class_label": row.class_label,
+                "class_name": row.class_name,
+                "temporal_window": row.temporal_window,
+                "start_time": _format_float(row.start_time),
+                "end_time": _format_float(row.end_time),
+                "n": row.n,
+                "csp_correct_mean": _format_float(
+                    row.csp_correct_mean
+                ),
+                "csp_correct_std": _format_float(
+                    row.csp_correct_std
+                ),
+                "eegnet_correct_mean": _format_float(
+                    row.eegnet_correct_mean
+                ),
+                "eegnet_correct_std": _format_float(
+                    row.eegnet_correct_std
+                ),
+                "mean_difference": _format_float(
+                    row.mean_difference
+                ),
+                "wilcoxon_statistic": _format_float(
+                    row.wilcoxon_statistic
+                ),
+                "p_value": _format_float(row.p_value),
+                "p_value_fdr": _format_float(row.p_value_fdr),
+                "significant_fdr": row.significant_fdr,
+                "direction": row.direction,
+            })
+
+    return output_file
+
+
 def print_temporal_statistics(
     rows: list[TemporalStatisticRow],
 ) -> None:
@@ -782,6 +1064,47 @@ def print_csp_lda_classwise_temporal_statistics(
             f"{row.n:>2} "
             f"{_mean_sd(row.correct_mean, row.correct_std):<22} "
             f"{_mean_sd(row.incorrect_mean, row.incorrect_std):<24} "
+            f"{row.mean_difference:>8.4f} "
+            f"{row.p_value:>10.4g} "
+            f"{row.p_value_fdr:>10.4g}"
+            f"{marker}"
+        )
+
+
+def print_classwise_csp_lda_vs_eegnet_correct_statistics(
+    rows: list[ClassModelTemporalStatisticRow],
+) -> None:
+    """
+    Print a compact class-wise CSP+LDA vs EEGNet correct summary.
+    """
+    print()
+    print("=" * 70)
+    print("Class-wise CSP+LDA correct vs EEGNet correct temporal relevance")
+    print("=" * 70)
+    print(
+        f"{'Class':<12} "
+        f"{'Window':<10} "
+        f"{'n':>2} "
+        f"{'CSP mean+/-SD':<20} "
+        f"{'EEGNet mean+/-SD':<22} "
+        f"{'Delta':>8} "
+        f"{'p':>10} "
+        f"{'p_FDR':>10}"
+    )
+
+    for row in rows:
+        marker = (
+            "*"
+            if row.significant_fdr
+            else ""
+        )
+
+        print(
+            f"{row.class_name:<12} "
+            f"{row.temporal_window:<10} "
+            f"{row.n:>2} "
+            f"{_mean_sd(row.csp_correct_mean, row.csp_correct_std):<20} "
+            f"{_mean_sd(row.eegnet_correct_mean, row.eegnet_correct_std):<22} "
             f"{row.mean_difference:>8.4f} "
             f"{row.p_value:>10.4g} "
             f"{row.p_value_fdr:>10.4g}"
@@ -932,6 +1255,31 @@ def _load_csp_subject_classwise_profiles(
     return profiles
 
 
+def _load_csp_subject_model_classwise_profiles(
+    subject: int,
+    condition: TrialSelection,
+) -> list[SubjectModelClassTemporalProfile]:
+    """
+    Compute class-wise CSP+LDA temporal profiles for one condition.
+    """
+    class_profiles = _load_csp_subject_classwise_profiles(
+        subject
+    )
+
+    return [
+        SubjectModelClassTemporalProfile(
+            subject=profile.subject,
+            model="csp",
+            class_label=profile.class_label,
+            class_name=profile.class_name,
+            condition=profile.condition,
+            values=profile.values,
+        )
+        for profile in class_profiles
+        if profile.condition == condition
+    ]
+
+
 def _load_eegnet_subject_profiles(
     subject: int,
 ) -> list[SubjectTemporalProfile]:
@@ -984,6 +1332,82 @@ def _load_eegnet_subject_profiles(
                         )
                     ),
                     times=times,
+                ),
+            )
+        )
+
+    return profiles
+
+
+def _load_eegnet_subject_model_classwise_profiles(
+    subject: int,
+    condition: TrialSelection,
+) -> list[SubjectModelClassTemporalProfile]:
+    """
+    Load saved SHAP values and build class-wise EEGNet profiles.
+    """
+    shap_file = get_time_domain_shap_values_path(
+        subject
+    )
+
+    if not shap_file.exists():
+        raise FileNotFoundError(
+            "Saved time-domain SHAP values are missing: "
+            f"{shap_file}"
+        )
+
+    result = load_time_domain_shap_result(
+        shap_file
+    )
+
+    times = _create_times(
+        result.values.shape[-1]
+    )
+
+    trial_mask = (
+        result.correct_mask
+        if condition == "correct"
+        else result.incorrect_mask
+    )
+
+    class_relevance = _compute_class_shap_relevance(
+        shap_values=result.values,
+        labels=result.labels,
+        trial_mask=trial_mask,
+    )
+
+    temporal_relevance = compute_temporal_shap_relevance(
+        class_relevance
+    )
+
+    profiles = []
+
+    for class_label, class_name in zip(
+        CLASS_LABELS,
+        CLASS_NAMES,
+        strict=True,
+    ):
+        class_curve = temporal_relevance.get(
+            class_label,
+            np.full(
+                len(times),
+                np.nan,
+                dtype=np.float64,
+            ),
+        )
+
+        profiles.append(
+            SubjectModelClassTemporalProfile(
+                subject=subject,
+                model="eegnet",
+                class_label=class_label,
+                class_name=_display_class_name(
+                    class_name
+                ),
+                condition=condition,
+                values=_single_class_temporal_profile(
+                    class_curve,
+                    times,
                 ),
             )
         )
@@ -1480,6 +1904,74 @@ def _paired_class_window_values(
     )
 
 
+def _paired_model_class_window_values(
+    profile_lookup: dict[
+        tuple[int, ModelName, int, TrialSelection],
+        np.ndarray,
+    ],
+    class_label: int,
+    window_index: int,
+    condition: TrialSelection,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Return paired CSP+LDA/EEGNet values for one class/window.
+    """
+    csp_values = []
+    eegnet_values = []
+
+    for subject in SUBJECTS:
+        csp_profile = profile_lookup.get((
+            subject,
+            "csp",
+            class_label,
+            condition,
+        ))
+
+        eegnet_profile = profile_lookup.get((
+            subject,
+            "eegnet",
+            class_label,
+            condition,
+        ))
+
+        if (
+            csp_profile is None
+            or eegnet_profile is None
+        ):
+            continue
+
+        csp_value = csp_profile[
+            window_index
+        ]
+        eegnet_value = eegnet_profile[
+            window_index
+        ]
+
+        if not (
+            np.isfinite(csp_value)
+            and np.isfinite(eegnet_value)
+        ):
+            continue
+
+        csp_values.append(
+            csp_value
+        )
+        eegnet_values.append(
+            eegnet_value
+        )
+
+    return (
+        np.asarray(
+            csp_values,
+            dtype=np.float64,
+        ),
+        np.asarray(
+            eegnet_values,
+            dtype=np.float64,
+        ),
+    )
+
+
 def _paired_wilcoxon(
     differences: np.ndarray,
 ) -> tuple[float, float]:
@@ -1608,6 +2100,26 @@ def _classwise_direction_label(
         return "CSP correct < CSP incorrect"
 
     return "CSP correct = CSP incorrect"
+
+
+def _classwise_model_direction_label(
+    mean_difference: float,
+) -> str:
+    """
+    Build a readable direction for EEGNet correct - CSP correct.
+    """
+    if not np.isfinite(
+        mean_difference
+    ):
+        return "not available"
+
+    if mean_difference > 0:
+        return "EEGNet correct > CSP correct"
+
+    if mean_difference < 0:
+        return "EEGNet correct < CSP correct"
+
+    return "EEGNet correct = CSP correct"
 
 
 def _display_class_name(

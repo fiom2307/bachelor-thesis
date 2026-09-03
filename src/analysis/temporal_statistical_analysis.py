@@ -7,7 +7,9 @@ from typing import Literal
 
 import joblib
 import numpy as np
+import statsmodels.api as sm
 from scipy.stats import wilcoxon
+from statsmodels.genmod.cov_struct import Exchangeable
 from statsmodels.stats.multitest import multipletests
 
 from src.analysis.csp_pattern_analysis.temporal_relevance import (
@@ -27,6 +29,8 @@ from src.utils.paths import (
     get_subject_name,
     get_temporal_classwise_csp_vs_eegnet_correct_results_path,
     get_temporal_classwise_statistical_results_path,
+    get_temporal_left_hand_early_gee_results_path,
+    get_temporal_left_hand_early_gee_trials_path,
     get_temporal_statistical_profiles_path,
     get_temporal_statistical_results_path,
     get_time_domain_shap_values_path,
@@ -49,6 +53,7 @@ N_FOLDS = 5
 SFREQ = 250.0
 ALPHA = 0.05
 NORMALIZATION_WINDOW = (0.5, 4.0)
+LEFT_HAND_LABEL = 0
 
 TEMPORAL_WINDOWS: tuple[
     tuple[str, float, float],
@@ -161,6 +166,27 @@ class ClassModelTemporalStatisticRow:
     direction: str
 
 
+@dataclass(frozen=True)
+class LeftHandEarlyRelevanceTrial:
+    subject: int
+    trial_index: int
+    early_relevance: float
+    correct: int
+
+
+@dataclass(frozen=True)
+class LeftHandEarlyRelevanceGeeRow:
+    coefficient: float
+    standard_error: float
+    odds_ratio: float
+    odds_ratio_ci_low: float
+    odds_ratio_ci_high: float
+    p_value: float
+    n_subjects: int
+    n_left_hand_trials: int
+    interpretation: str
+
+
 COMPARISONS: tuple[
     TemporalComparison,
     ...,
@@ -268,6 +294,32 @@ def run_classwise_csp_lda_vs_eegnet_correct_temporal_analysis() -> tuple[
     return profiles, rows
 
 
+def run_left_hand_early_relevance_gee_analysis() -> tuple[
+    list[LeftHandEarlyRelevanceTrial],
+    LeftHandEarlyRelevanceGeeRow,
+]:
+    """
+    Run a subject-clustered GEE model for Left-Hand early relevance.
+    """
+    trials = collect_left_hand_early_relevance_trials()
+    row = fit_left_hand_early_relevance_gee(
+        trials
+    )
+
+    save_left_hand_early_relevance_trials(
+        trials
+    )
+    save_left_hand_early_relevance_gee_results(
+        row
+    )
+
+    print_left_hand_early_relevance_gee_results(
+        row
+    )
+
+    return trials, row
+
+
 def collect_subject_temporal_profiles() -> list[
     SubjectTemporalProfile
 ]:
@@ -334,6 +386,24 @@ def collect_classwise_model_correct_temporal_profiles() -> list[
         )
 
     return profiles
+
+
+def collect_left_hand_early_relevance_trials() -> list[
+    LeftHandEarlyRelevanceTrial
+]:
+    """
+    Compute normalized early relevance for each Left-Hand trial.
+    """
+    trials = []
+
+    for subject in SUBJECTS:
+        trials.extend(
+            _load_left_hand_early_relevance_trials_for_subject(
+                subject
+            )
+        )
+
+    return trials
 
 
 def compute_temporal_statistics(
@@ -681,6 +751,115 @@ def compute_classwise_csp_lda_vs_eegnet_correct_statistics(
     return rows
 
 
+def fit_left_hand_early_relevance_gee(
+    trials: list[LeftHandEarlyRelevanceTrial],
+) -> LeftHandEarlyRelevanceGeeRow:
+    """
+    Fit correct ~ early_relevance using binomial GEE by subject.
+    """
+    finite_trials = [
+        trial
+        for trial in trials
+        if np.isfinite(
+            trial.early_relevance
+        )
+    ]
+
+    if not finite_trials:
+        raise ValueError(
+            "No finite Left-Hand early-relevance trials are available."
+        )
+
+    correct = np.asarray(
+        [
+            trial.correct
+            for trial in finite_trials
+        ],
+        dtype=np.float64,
+    )
+
+    if len(np.unique(correct)) < 2:
+        raise ValueError(
+            "GEE requires both correct and incorrect Left-Hand trials."
+        )
+
+    early_relevance = np.asarray(
+        [
+            trial.early_relevance
+            for trial in finite_trials
+        ],
+        dtype=np.float64,
+    )
+    groups = np.asarray(
+        [
+            trial.subject
+            for trial in finite_trials
+        ]
+    )
+
+    predictors = sm.add_constant(
+        early_relevance
+    )
+
+    model = sm.GEE(
+        endog=correct,
+        exog=predictors,
+        groups=groups,
+        family=sm.families.Binomial(),
+        cov_struct=Exchangeable(),
+    )
+
+    result = model.fit()
+    confidence_interval = np.asarray(
+        result.conf_int()
+    )
+
+    coefficient = float(
+        result.params[1]
+    )
+    standard_error = float(
+        result.bse[1]
+    )
+    p_value = float(
+        result.pvalues[1]
+    )
+    odds_ratio_ci_low = float(
+        np.exp(
+            confidence_interval[1, 0]
+        )
+    )
+    odds_ratio_ci_high = float(
+        np.exp(
+            confidence_interval[1, 1]
+        )
+    )
+
+    return LeftHandEarlyRelevanceGeeRow(
+        coefficient=coefficient,
+        standard_error=standard_error,
+        odds_ratio=float(
+            np.exp(
+                coefficient
+            )
+        ),
+        odds_ratio_ci_low=odds_ratio_ci_low,
+        odds_ratio_ci_high=odds_ratio_ci_high,
+        p_value=p_value,
+        n_subjects=len(
+            np.unique(
+                groups
+            )
+        ),
+        n_left_hand_trials=len(
+            finite_trials
+        ),
+        interpretation=_left_hand_early_gee_interpretation(
+            coefficient,
+            p_value,
+        ),
+    )
+
+
 def save_temporal_profiles(
     profiles: list[SubjectTemporalProfile],
     output_file: str | Path | None = None,
@@ -981,6 +1160,115 @@ def save_classwise_csp_lda_vs_eegnet_correct_statistics(
     return output_file
 
 
+def save_left_hand_early_relevance_trials(
+    trials: list[LeftHandEarlyRelevanceTrial],
+    output_file: str | Path | None = None,
+) -> Path:
+    """
+    Save trial-level Left-Hand early relevance values.
+    """
+    if output_file is None:
+        output_file = get_temporal_left_hand_early_gee_trials_path()
+
+    output_file = Path(
+        output_file
+    )
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.writer(
+            file
+        )
+
+        writer.writerow([
+            "subject",
+            "trial_index",
+            "early_relevance",
+            "correct",
+        ])
+
+        for trial in trials:
+            writer.writerow([
+                get_subject_name(
+                    trial.subject
+                ),
+                trial.trial_index,
+                _format_float(
+                    trial.early_relevance
+                ),
+                trial.correct,
+            ])
+
+    return output_file
+
+
+def save_left_hand_early_relevance_gee_results(
+    row: LeftHandEarlyRelevanceGeeRow,
+    output_file: str | Path | None = None,
+) -> Path:
+    """
+    Save the Left-Hand early-relevance GEE result.
+    """
+    if output_file is None:
+        output_file = get_temporal_left_hand_early_gee_results_path()
+
+    output_file = Path(
+        output_file
+    )
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "model",
+                "coefficient",
+                "standard_error",
+                "odds_ratio",
+                "odds_ratio_ci_low",
+                "odds_ratio_ci_high",
+                "p_value",
+                "n_subjects",
+                "n_left_hand_trials",
+                "interpretation",
+            ],
+        )
+
+        writer.writeheader()
+        writer.writerow({
+            "model": "correct ~ early_relevance",
+            "coefficient": _format_float(
+                row.coefficient
+            ),
+            "standard_error": _format_float(
+                row.standard_error
+            ),
+            "odds_ratio": _format_float(
+                row.odds_ratio
+            ),
+            "odds_ratio_ci_low": _format_float(
+                row.odds_ratio_ci_low
+            ),
+            "odds_ratio_ci_high": _format_float(
+                row.odds_ratio_ci_high
+            ),
+            "p_value": _format_float(
+                row.p_value
+            ),
+            "n_subjects": row.n_subjects,
+            "n_left_hand_trials": row.n_left_hand_trials,
+            "interpretation": row.interpretation,
+        })
+
+    return output_file
+
+
 def print_temporal_statistics(
     rows: list[TemporalStatisticRow],
 ) -> None:
@@ -1112,6 +1400,35 @@ def print_classwise_csp_lda_vs_eegnet_correct_statistics(
         )
 
 
+def print_left_hand_early_relevance_gee_results(
+    row: LeftHandEarlyRelevanceGeeRow,
+) -> None:
+    """
+    Print a concise GEE model summary.
+    """
+    print()
+    print("=" * 70)
+    print("CSP+LDA Left Hand early relevance GEE")
+    print("=" * 70)
+    print(
+        "correct ~ early_relevance "
+        f"(subjects={row.n_subjects}, "
+        f"trials={row.n_left_hand_trials})"
+    )
+    print(
+        f"coefficient={row.coefficient:.4g}, "
+        f"SE={row.standard_error:.4g}, "
+        f"OR={row.odds_ratio:.4g}, "
+        "95% OR CI="
+        f"[{row.odds_ratio_ci_low:.4g}, "
+        f"{row.odds_ratio_ci_high:.4g}], "
+        f"p={row.p_value:.4g}"
+    )
+    print(
+        row.interpretation
+    )
+
+
 def _load_csp_subject_profiles(
     subject: int,
 ) -> list[SubjectTemporalProfile]:
@@ -1169,6 +1486,76 @@ def _load_csp_subject_profiles(
         )
 
     return profiles
+
+
+def _load_left_hand_early_relevance_trials_for_subject(
+    subject: int,
+) -> list[LeftHandEarlyRelevanceTrial]:
+    """
+    Compute trial-level early relevance for true Left-Hand trials.
+    """
+    csps, ldas = _load_subject_models(
+        subject
+    )
+
+    subject_data = get_data_for_subject(
+        subject
+    )
+
+    if subject_data is None:
+        raise FileNotFoundError(
+            "Could not load data for "
+            f"{get_subject_name(subject)}."
+        )
+
+    _, _, x_eval, y_eval = subject_data
+
+    result = compute_trial_temporal_relevance(
+        csps=csps,
+        ldas=ldas,
+        data=x_eval,
+        labels=y_eval,
+    )
+
+    times = _create_times(
+        result.values.shape[1]
+    )
+
+    left_hand_indices = np.flatnonzero(
+        result.labels == LEFT_HAND_LABEL
+    )
+
+    trials = []
+
+    for trial_index in left_hand_indices:
+        early_relevance = (
+            _single_trial_normalized_temporal_window_value(
+                result.values[
+                    trial_index
+                ],
+                times=times,
+                start=0.5,
+                end=1.5,
+            )
+        )
+
+        trials.append(
+            LeftHandEarlyRelevanceTrial(
+                subject=subject,
+                trial_index=int(
+                    trial_index
+                ),
+                early_relevance=early_relevance,
+                correct=int(
+                    result.predictions[
+                        trial_index
+                    ]
+                    == LEFT_HAND_LABEL
+                ),
+            )
+        )
+
+    return trials
 
 
 def _load_csp_subject_classwise_profiles(
@@ -1758,6 +2145,73 @@ def _single_class_temporal_profile(
     return window_values
 
 
+def _single_trial_normalized_temporal_window_value(
+    temporal_relevance: np.ndarray,
+    times: np.ndarray,
+    start: float,
+    end: float,
+) -> float:
+    """
+    Area-normalize one trial curve, then average one temporal window.
+    """
+    temporal_relevance = np.asarray(
+        temporal_relevance,
+        dtype=np.float64,
+    )
+
+    times = np.asarray(
+        times,
+        dtype=np.float64,
+    )
+
+    if not np.any(
+        np.isfinite(
+            temporal_relevance
+        )
+    ):
+        return np.nan
+
+    normalization_mask = (
+        (times >= NORMALIZATION_WINDOW[0])
+        & (times <= NORMALIZATION_WINDOW[1])
+    )
+
+    denominator = np.trapezoid(
+        temporal_relevance[
+            normalization_mask
+        ],
+        times[
+            normalization_mask
+        ],
+    )
+
+    if (
+        not np.isfinite(
+            denominator
+        )
+        or denominator <= 0
+    ):
+        return np.nan
+
+    normalized_curve = (
+        temporal_relevance
+        / denominator
+    )
+
+    window_mask = (
+        (times >= start)
+        & (times < end)
+    )
+
+    return float(
+        np.nanmean(
+            normalized_curve[
+                window_mask
+            ]
+        )
+    )
+
+
 def _create_times(
     n_times: int,
 ) -> np.ndarray:
@@ -2120,6 +2574,30 @@ def _classwise_model_direction_label(
         return "EEGNet correct < CSP correct"
 
     return "EEGNet correct = CSP correct"
+
+
+def _left_hand_early_gee_interpretation(
+    coefficient: float,
+    p_value: float,
+) -> str:
+    """
+    Interpret the early-relevance GEE coefficient.
+    """
+    if (
+        np.isfinite(coefficient)
+        and np.isfinite(p_value)
+        and coefficient > 0
+        and p_value < ALPHA
+    ):
+        return (
+            "Greater early temporal relevance is associated with "
+            "a higher probability of correct Left Hand classification."
+        )
+
+    return (
+        "There is insufficient evidence that early temporal relevance "
+        "is associated with correct Left Hand classification."
+    )
 
 
 def _display_class_name(

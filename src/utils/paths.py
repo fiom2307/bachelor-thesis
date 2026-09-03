@@ -948,6 +948,26 @@ def get_temporal_classwise_csp_vs_eegnet_correct_plot_path(
     )
 
 
+def get_temporal_left_hand_early_gee_trials_path() -> Path:
+    """
+    Return the Left-Hand early-relevance GEE trial-level CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "csp_lda_left_hand_early_relevance_gee_trials.csv"
+    )
+
+
+def get_temporal_left_hand_early_gee_results_path() -> Path:
+    """
+    Return the Left-Hand early-relevance GEE result CSV path.
+    """
+    return (
+        get_temporal_statistical_analysis_dir()
+        / "csp_lda_left_hand_early_relevance_gee_results.csv"
+    )
+
+
 def get_channel_statistical_analysis_dir() -> Path:
     """
     Return the channel statistical analysis directory.

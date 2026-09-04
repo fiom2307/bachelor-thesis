@@ -286,7 +286,6 @@ def _plot_spatial_relevance(
     selection: str,
     subject: int | None,
     vmax: float,
-    channel_relevance_std: np.ndarray | None = None,
 ) -> None:
     """
     Plot channel relevance, rankings and topographies.
@@ -340,7 +339,6 @@ def _plot_spatial_relevance(
             channel_relevance_path.parent
         ),
         class_counts=class_counts,
-        channel_relevance_std=channel_relevance_std,
         vmin=0.0,
         vmax=vmax,
     )
@@ -388,7 +386,6 @@ def _plot_spatial_relevance(
         ),
         sfreq=SFREQ,
         class_counts=class_counts,
-        channel_relevance_std=channel_relevance_std,
         vmin=0.0,
         vmax=vmax,
     )
@@ -919,12 +916,6 @@ def plot_global_analysis(
         axis=0,
     )
 
-    std_correct_channel_relevance = (
-        _nanstd_across_subjects(
-            subject_correct_channel_relevances
-        )
-    )
-
     mean_incorrect_channel_relevance = np.nanmean(
         np.stack(
             subject_incorrect_channel_relevances,
@@ -933,21 +924,9 @@ def plot_global_analysis(
         axis=0,
     )
 
-    std_incorrect_channel_relevance = (
-        _nanstd_across_subjects(
-            subject_incorrect_channel_relevances
-        )
-    )
-
     global_spatial_vmax = _compute_shared_max(
-        (
-            mean_correct_channel_relevance
-            + std_correct_channel_relevance
-        ),
-        (
-            mean_incorrect_channel_relevance
-            + std_incorrect_channel_relevance
-        ),
+        mean_correct_channel_relevance,
+        mean_incorrect_channel_relevance,
     )
 
     print(
@@ -964,9 +943,6 @@ def plot_global_analysis(
         selection="correct",
         subject=None,
         vmax=global_spatial_vmax,
-        channel_relevance_std=(
-            std_correct_channel_relevance
-        ),
     )
 
     _plot_spatial_relevance(
@@ -978,9 +954,6 @@ def plot_global_analysis(
         selection="incorrect",
         subject=None,
         vmax=global_spatial_vmax,
-        channel_relevance_std=(
-            std_incorrect_channel_relevance
-        ),
     )
 
     # ==========================================================

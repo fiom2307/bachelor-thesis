@@ -10,6 +10,7 @@ from src.data.labels import (
     CLASS_LABELS,
     CLASS_NAMES,
 )
+from src.visualization.common import CLASS_COLORS
 
 
 TrialSelection = Literal[
@@ -139,12 +140,22 @@ def plot_temporal_relevance(
     # Figure
     # ----------------------------------------------------------
 
-    figure, axis = plt.subplots(
-        figsize=(13, 7),
+    figure, axes = plt.subplots(
+        2,
+        2,
+        figsize=(13, 8),
         constrained_layout=True,
     )
 
+    axes = axes.ravel()
+
     for class_id in class_ids:
+        axis = axes[
+            class_ids.index(
+                class_id
+            )
+        ]
+
         relevance = np.asarray(
             temporal_relevance[
                 class_id
@@ -161,9 +172,8 @@ def plot_temporal_relevance(
         line = axis.plot(
             times,
             relevance,
-            label=_get_class_title(
-                class_id,
-                trial_counts,
+            color=_get_class_color(
+                class_id
             ),
         )[0]
 
@@ -216,52 +226,48 @@ def plot_temporal_relevance(
                     linewidth=0,
                 )
 
-    # ----------------------------------------------------------
-    # Shared axis limits
-    # ----------------------------------------------------------
+        window_start, window_end = (
+            imagery_window
+        )
 
-    window_start, window_end = (
-        imagery_window
-    )
+        axis.set_xlim(
+            window_start,
+            window_end,
+        )
 
-    axis.set_xlim(
-        window_start,
-        window_end,
-    )
+        axis.set_ylim(
+            ymin,
+            ymax,
+        )
 
-    axis.set_ylim(
-        ymin,
-        ymax,
-    )
+        axis.set_xlabel(
+            "Time relative to cue (s)"
+        )
 
-    # ----------------------------------------------------------
-    # Labels
-    # ----------------------------------------------------------
+        axis.set_ylabel(
+            "Mean absolute SHAP value"
+        )
 
-    axis.set_xlabel(
-        "Time relative to cue (s)"
-    )
+        axis.set_title(
+            _get_class_title(
+                class_id,
+                trial_counts,
+            )
+        )
 
-    axis.set_ylabel(
-        "Mean absolute SHAP value"
-    )
+        axis.grid(
+            alpha=0.25,
+        )
 
-    axis.set_title(
+    figure.suptitle(
         _build_title(
             base_title=(
                 "EEGNet temporal SHAP relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,
-        )
-    )
-
-    axis.legend(
-        title="Motor-imagery class"
-    )
-
-    axis.grid(
-        alpha=0.25,
+        ),
+        fontsize=15,
     )
 
     return figure
@@ -386,12 +392,22 @@ def plot_frequency_relevance(
     # Figure
     # ----------------------------------------------------------
 
-    figure, axis = plt.subplots(
-        figsize=(13, 7),
+    figure, axes = plt.subplots(
+        2,
+        2,
+        figsize=(13, 8),
         constrained_layout=True,
     )
 
+    axes = axes.ravel()
+
     for class_id in class_ids:
+        axis = axes[
+            class_ids.index(
+                class_id
+            )
+        ]
+
         relevance = np.asarray(
             frequency_relevance[
                 class_id
@@ -411,9 +427,8 @@ def plot_frequency_relevance(
             x_positions,
             relevance,
             marker="o",
-            label=_get_class_title(
-                class_id,
-                trial_counts,
+            color=_get_class_color(
+                class_id
             ),
         )[0]
 
@@ -468,62 +483,49 @@ def plot_frequency_relevance(
                     linewidth=0,
                 )
 
-    # ----------------------------------------------------------
-    # X-axis
-    # ----------------------------------------------------------
+        axis.set_xticks(
+            x_positions
+        )
 
-    axis.set_xticks(
-        x_positions
-    )
+        axis.set_xticklabels(
+            band_labels,
+            rotation=45,
+            ha="right",
+        )
 
-    axis.set_xticklabels(
-        band_labels,
-        rotation=45,
-        ha="right",
-    )
+        axis.set_xlabel(
+            "Frequency band (Hz)"
+        )
 
-    axis.set_xlabel(
-        "Frequency band (Hz)"
-    )
+        axis.set_ylim(
+            ymin,
+            ymax,
+        )
 
-    # ----------------------------------------------------------
-    # Shared Y-axis
-    # ----------------------------------------------------------
+        axis.set_ylabel(
+            "Mean absolute SHAP value"
+        )
 
-    axis.set_ylim(
-        ymin,
-        ymax,
-    )
+        axis.set_title(
+            _get_class_title(
+                class_id,
+                trial_counts,
+            )
+        )
 
-    axis.set_ylabel(
-        "Mean absolute SHAP value"
-    )
+        axis.grid(
+            alpha=0.25,
+        )
 
-    # ----------------------------------------------------------
-    # Title
-    # ----------------------------------------------------------
-
-    axis.set_title(
+    figure.suptitle(
         _build_title(
             base_title=(
                 "EEGNet frequency-domain SHAP relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,
-        )
-    )
-
-    # ----------------------------------------------------------
-    # Legend + grid
-    # ----------------------------------------------------------
-
-    axis.legend(
-        title="Motor-imagery class",
-        loc="upper right",
-    )
-
-    axis.grid(
-        alpha=0.25,
+        ),
+        fontsize=15,
     )
 
     return figure
@@ -552,31 +554,14 @@ def plot_topographies(
         class_ids
     )
 
-    if topographic_relevance_std is None:
-        figure, axes = plt.subplots(
-            nrows=2,
-            ncols=2,
-            figsize=(12, 10),
-            constrained_layout=True,
-        )
+    figure, axes = plt.subplots(
+        nrows=2,
+        ncols=2,
+        figsize=(12, 10),
+        constrained_layout=True,
+    )
 
-        mean_axes = axes.ravel()
-        std_axes = None
-
-    else:
-        figure, axes = plt.subplots(
-            nrows=2,
-            ncols=len(class_ids),
-            figsize=(4 * len(class_ids), 9),
-            constrained_layout=True,
-        )
-
-        axes = np.asarray(
-            axes
-        )
-
-        mean_axes = axes[0]
-        std_axes = axes[1]
+    mean_axes = axes.ravel()
 
     if vmax is None:
         vmax = max(
@@ -642,46 +627,6 @@ def plot_topographies(
             )
         )
 
-        if topographic_relevance_std is not None:
-            if class_id not in topographic_relevance_std:
-                continue
-
-            std_relevance = topographic_relevance_std[
-                class_id
-            ]
-
-            if len(std_relevance) != len(
-                info.ch_names
-            ):
-                raise ValueError(
-                    "The number of topographic relevance "
-                    "SD values must match the number of "
-                    "channels."
-                )
-
-            std_axis = std_axes[
-                class_index
-            ]
-
-            mne.viz.plot_topomap(
-                data=std_relevance,
-                pos=info,
-                axes=std_axis,
-                show=False,
-                sensors=True,
-                names=channel_names,
-                contours=6,
-                cmap="viridis",
-                vlim=(
-                    vmin,
-                    vmax,
-                ),
-            )
-
-            std_axis.set_title(
-                "SD"
-            )
-
     if image is not None:
         colorbar = figure.colorbar(
             image,
@@ -743,22 +688,6 @@ def plot_channel_relevance(
         for class_id in class_ids
     ])
 
-    std_matrix = None
-
-    if channel_relevance_std is not None:
-        std_matrix = np.stack([
-            channel_relevance_std[
-                class_id
-            ]
-            for class_id in class_ids
-        ])
-
-        if std_matrix.shape != relevance_matrix.shape:
-            raise ValueError(
-                "channel_relevance_std must match "
-                "channel_relevance shape."
-            )
-
     if relevance_matrix.shape[1] != len(
         channel_names
     ):
@@ -794,24 +723,12 @@ def plot_channel_relevance(
     # Figure
     # ----------------------------------------------------------
 
-    n_panels = (
-        2
-        if std_matrix is not None
-        else 1
-    )
-
-    figure, axes = plt.subplots(
-        n_panels,
-        1,
-        figsize=(15, 5 * n_panels),
+    figure, axis = plt.subplots(
+        figsize=(15, 5),
         constrained_layout=True,
     )
 
-    axes = np.atleast_1d(
-        axes
-    )
-
-    image = axes[0].imshow(
+    image = axis.imshow(
         relevance_matrix,
         aspect="auto",
         interpolation="nearest",
@@ -828,54 +745,35 @@ def plot_channel_relevance(
         for class_id in class_ids
     ]
 
-    if std_matrix is not None:
-        axes[1].imshow(
-            std_matrix,
-            aspect="auto",
-            interpolation="nearest",
-            cmap="viridis",
-            vmin=vmin,
-            vmax=vmax,
+    axis.set_xticks(
+        np.arange(
+            len(channel_names)
         )
+    )
 
-        axes[0].set_title(
-            "Mean"
-        )
+    axis.set_xticklabels(
+        channel_names,
+        rotation=45,
+        ha="right",
+    )
 
-        axes[1].set_title(
-            "Standard deviation across subjects"
+    axis.set_yticks(
+        np.arange(
+            len(class_ids)
         )
+    )
 
-    for axis in axes:
-        axis.set_xticks(
-            np.arange(
-                len(channel_names)
-            )
-        )
+    axis.set_yticklabels(
+        y_labels
+    )
 
-        axis.set_xticklabels(
-            channel_names,
-            rotation=45,
-            ha="right",
-        )
+    axis.set_xlabel(
+        "EEG channel"
+    )
 
-        axis.set_yticks(
-            np.arange(
-                len(class_ids)
-            )
-        )
-
-        axis.set_yticklabels(
-            y_labels
-        )
-
-        axis.set_xlabel(
-            "EEG channel"
-        )
-
-        axis.set_ylabel(
-            "Motor-imagery class"
-        )
+    axis.set_ylabel(
+        "Motor-imagery class"
+    )
 
     figure.suptitle(
         _build_title(
@@ -890,7 +788,7 @@ def plot_channel_relevance(
 
     colorbar = figure.colorbar(
         image,
-        ax=axes.tolist(),
+        ax=axis,
         shrink=0.9,
     )
 
@@ -1096,6 +994,25 @@ def _get_class_title(
     return (
         f"{class_name} "
         f"(n={trial_count})"
+    )
+
+
+def _get_class_color(
+    class_id: int,
+) -> str | None:
+    """
+    Return the shared visualization color for a class.
+    """
+    class_index = list(
+        CLASS_LABELS
+    ).index(class_id)
+
+    class_name = CLASS_NAMES[
+        class_index
+    ]
+
+    return CLASS_COLORS.get(
+        class_name
     )
 
 

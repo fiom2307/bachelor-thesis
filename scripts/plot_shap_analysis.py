@@ -666,11 +666,6 @@ def plot_mean_shap(
         VectorRelevance,
     ] = {}
 
-    channel_relevance_stds: dict[
-        TrialSelection,
-        VectorRelevance,
-    ] = {}
-
     channel_rankings_by_selection = {}
 
     temporal_relevances: dict[
@@ -684,11 +679,6 @@ def plot_mean_shap(
     ] = {}
 
     topographic_relevances: dict[
-        TrialSelection,
-        VectorRelevance,
-    ] = {}
-
-    topographic_relevance_stds: dict[
         TrialSelection,
         VectorRelevance,
     ] = {}
@@ -749,16 +739,6 @@ def plot_mean_shap(
             )
         )
 
-        channel_relevance_std = (
-            _std_class_relevance([
-                compute_channel_shap_relevance(
-                    class_relevance
-                )
-                for class_relevance
-                in class_relevance_list
-            ])
-        )
-
         channel_rankings = rank_shap_channels(
             channel_relevance=channel_relevance,
             channel_names=channel_names,
@@ -788,18 +768,6 @@ def plot_mean_shap(
             )
         )
 
-        topographic_relevance_std = (
-            _std_class_relevance([
-                compute_topographic_shap_relevance(
-                    class_relevance=class_relevance,
-                    times=reference_times,
-                    imagery_window=IMAGERY_WINDOW,
-                )
-                for class_relevance
-                in class_relevance_list
-            ])
-        )
-
         mean_class_relevances[
             trial_selection
         ] = mean_class_relevance
@@ -820,10 +788,6 @@ def plot_mean_shap(
             trial_selection
         ] = channel_relevance
 
-        channel_relevance_stds[
-            trial_selection
-        ] = channel_relevance_std
-
         channel_rankings_by_selection[
             trial_selection
         ] = channel_rankings
@@ -840,20 +804,13 @@ def plot_mean_shap(
             trial_selection
         ] = topographic_relevance
 
-        topographic_relevance_stds[
-            trial_selection
-        ] = topographic_relevance_std
-
     # ------------------------------------------------------------------
     # Shared scales for correct + incorrect global plots
     # ------------------------------------------------------------------
 
     channel_vmax = (
         _compute_shared_relevance_max(
-            _sum_relevance_mappings(
-                channel_relevances,
-                channel_relevance_stds,
-            )
+            channel_relevances
         )
     )
 
@@ -877,10 +834,7 @@ def plot_mean_shap(
 
     topography_vmax = (
         _compute_shared_relevance_max(
-            _sum_relevance_mappings(
-                topographic_relevances,
-                topographic_relevance_stds,
-            )
+            topographic_relevances
         )
     )
 
@@ -939,12 +893,6 @@ def plot_mean_shap(
             ]
         )
 
-        channel_relevance_std = (
-            channel_relevance_stds[
-                trial_selection
-            ]
-        )
-
         channel_rankings = (
             channel_rankings_by_selection[
                 trial_selection
@@ -969,12 +917,6 @@ def plot_mean_shap(
             ]
         )
 
-        topographic_relevance_std = (
-            topographic_relevance_stds[
-                trial_selection
-            ]
-        )
-
         channel_relevance_figure = (
             plot_channel_relevance(
                 channel_relevance=channel_relevance,
@@ -982,9 +924,6 @@ def plot_mean_shap(
                 trial_selection=trial_selection,
                 subject=None,
                 trial_counts=mean_trial_counts,
-                channel_relevance_std=(
-                    channel_relevance_std
-                ),
                 vmin=0.0,
                 vmax=channel_vmax,
             )
@@ -1044,9 +983,6 @@ def plot_mean_shap(
                 subject=None,
                 imagery_window=IMAGERY_WINDOW,
                 trial_counts=mean_trial_counts,
-                topographic_relevance_std=(
-                    topographic_relevance_std
-                ),
                 vmin=0.0,
                 vmax=topography_vmax,
             )

@@ -6,6 +6,8 @@ import numpy as np
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 
+from src.visualization.common import CLASS_COLORS
+
 
 def plot_csp_channel_relevance(
     channel_relevance: np.ndarray,
@@ -39,18 +41,6 @@ def plot_csp_channel_relevance(
             "channel_relevance must have shape "
             f"{expected_shape}."
         )
-
-    if channel_relevance_std is not None:
-        channel_relevance_std = np.asarray(
-            channel_relevance_std,
-            dtype=np.float64,
-        )
-
-        if channel_relevance_std.shape != expected_shape:
-            raise ValueError(
-                "channel_relevance_std must have shape "
-                f"{expected_shape}."
-            )
 
     if class_counts is not None:
         class_counts = np.asarray(
@@ -104,28 +94,16 @@ def plot_csp_channel_relevance(
     # Plot
     # ----------------------------------------------------------
 
-    n_panels = (
-        2
-        if channel_relevance_std is not None
-        else 1
-    )
-
-    fig, axes = plt.subplots(
-        n_panels,
-        1,
-        figsize=(15, 5 * n_panels),
+    fig, ax = plt.subplots(
+        figsize=(15, 5),
         constrained_layout=True,
-    )
-
-    axes = np.atleast_1d(
-        axes
     )
 
     masked_relevance = np.ma.masked_invalid(
         channel_relevance
     )
 
-    image = axes[0].imshow(
+    image = ax.imshow(
         masked_relevance,
         aspect="auto",
         interpolation="nearest",
@@ -144,58 +122,35 @@ def plot_csp_channel_relevance(
             in enumerate(class_names)
         ]
 
-    if channel_relevance_std is not None:
-        masked_std = np.ma.masked_invalid(
-            channel_relevance_std
+    ax.set_xticks(
+        np.arange(
+            len(channel_names)
         )
+    )
 
-        axes[1].imshow(
-            masked_std,
-            aspect="auto",
-            interpolation="nearest",
-            cmap="viridis",
-            vmin=vmin,
-            vmax=vmax,
-        )
+    ax.set_xticklabels(
+        channel_names,
+        rotation=45,
+        ha="right",
+    )
 
-        axes[0].set_title(
-            "Mean"
+    ax.set_yticks(
+        np.arange(
+            len(class_names)
         )
+    )
 
-        axes[1].set_title(
-            "Standard deviation across subjects"
-        )
+    ax.set_yticklabels(
+        y_labels
+    )
 
-    for axis in axes:
-        axis.set_xticks(
-            np.arange(
-                len(channel_names)
-            )
-        )
+    ax.set_xlabel(
+        "EEG channel"
+    )
 
-        axis.set_xticklabels(
-            channel_names,
-            rotation=45,
-            ha="right",
-        )
-
-        axis.set_yticks(
-            np.arange(
-                len(class_names)
-            )
-        )
-
-        axis.set_yticklabels(
-            y_labels
-        )
-
-        axis.set_xlabel(
-            "EEG channel"
-        )
-
-        axis.set_ylabel(
-            "Motor-imagery class"
-        )
+    ax.set_ylabel(
+        "Motor-imagery class"
+    )
 
     # ----------------------------------------------------------
     # Title
@@ -242,7 +197,7 @@ def plot_csp_channel_relevance(
 
     colorbar = fig.colorbar(
         image,
-        ax=axes.tolist(),
+        ax=ax,
         shrink=0.9,
     )
 
@@ -689,14 +644,19 @@ def plot_csp_temporal_relevance(
     # Figure
     # ----------------------------------------------------------
 
-    fig, ax = plt.subplots(
-        figsize=(13, 7),
+    fig, axes = plt.subplots(
+        2,
+        2,
+        figsize=(13, 8),
         constrained_layout=True,
     )
+
+    axes = axes.ravel()
 
     for class_idx, class_name in enumerate(
         class_names
     ):
+        ax = axes[class_idx]
         relevance = temporal_relevance[
             class_idx
         ]
@@ -720,7 +680,9 @@ def plot_csp_temporal_relevance(
         line = ax.plot(
             times,
             relevance,
-            label=label,
+            color=CLASS_COLORS.get(
+                class_name
+            ),
         )[0]
 
         if temporal_relevance_std is not None:
@@ -760,31 +722,31 @@ def plot_csp_temporal_relevance(
                     linewidth=0,
                 )
 
-    # ----------------------------------------------------------
-    # Axis limits
-    # ----------------------------------------------------------
+        ax.set_xlim(
+            times[0],
+            times[-1],
+        )
 
-    ax.set_xlim(
-        times[0],
-        times[-1],
-    )
+        ax.set_ylim(
+            ymin,
+            ymax,
+        )
 
-    ax.set_ylim(
-        ymin,
-        ymax,
-    )
+        ax.set_xlabel(
+            "Time relative to cue (s)"
+        )
 
-    # ----------------------------------------------------------
-    # Labels
-    # ----------------------------------------------------------
+        ax.set_ylabel(
+            "Normalized temporal relevance"
+        )
 
-    ax.set_xlabel(
-        "Time relative to cue (s)"
-    )
+        ax.set_title(
+            label
+        )
 
-    ax.set_ylabel(
-        "Normalized temporal relevance"
-    )
+        ax.grid(
+            alpha=0.25,
+        )
 
     # ----------------------------------------------------------
     # Title formatting, same style as SHAP
@@ -819,22 +781,10 @@ def plot_csp_temporal_relevance(
     else:
         title_suffix = subject
 
-    ax.set_title(
+    fig.suptitle(
         "CSP+LDA temporal relevance\n"
-        f"({title_suffix})"
-    )
-
-    # ----------------------------------------------------------
-    # Legend + grid
-    # ----------------------------------------------------------
-
-    ax.legend(
-        title="Motor-imagery class",
-        loc="upper right",
-    )
-
-    ax.grid(
-        alpha=0.25,
+        f"({title_suffix})",
+        fontsize=15,
     )
 
     # ----------------------------------------------------------
@@ -977,14 +927,19 @@ def plot_csp_frequency_relevance(
     # Figure
     # ----------------------------------------------------------
 
-    fig, ax = plt.subplots(
-        figsize=(13, 7),
+    fig, axes = plt.subplots(
+        2,
+        2,
+        figsize=(13, 8),
         constrained_layout=True,
     )
+
+    axes = axes.ravel()
 
     for class_idx, class_name in enumerate(
         class_names
     ):
+        ax = axes[class_idx]
         relevance = frequency_relevance[
             class_idx
         ]
@@ -1013,7 +968,9 @@ def plot_csp_frequency_relevance(
             relevance[
                 finite_mask
             ],
-            label=label,
+            color=CLASS_COLORS.get(
+                class_name
+            ),
         )[0]
 
         if frequency_relevance_std is not None:
@@ -1051,27 +1008,39 @@ def plot_csp_frequency_relevance(
                     linewidth=0,
                 )
 
-    # ----------------------------------------------------------
-    # Axes
-    # ----------------------------------------------------------
+        ax.set_xlim(
+            frequencies[0],
+            frequencies[-1],
+        )
 
-    ax.set_xlim(
-        frequencies[0],
-        frequencies[-1],
-    )
+        ax.set_ylim(
+            ymin,
+            ymax,
+        )
 
-    ax.set_ylim(
-        ymin,
-        ymax,
-    )
+        ax.set_xlabel(
+            "Frequency (Hz)"
+        )
 
-    ax.set_xlabel(
-        "Frequency (Hz)"
-    )
+        ax.set_ylabel(
+            "Normalized frequency relevance"
+        )
 
-    ax.set_ylabel(
-        "Normalized frequency relevance"
-    )
+        ax.set_title(
+            label
+        )
+
+        ax.grid(
+            alpha=0.25,
+        )
+
+        ax.set_xticks(
+            np.arange(
+                8,
+                31,
+                2,
+            )
+        )
 
     # ----------------------------------------------------------
     # Title — same structure as SHAP
@@ -1106,36 +1075,10 @@ def plot_csp_frequency_relevance(
     else:
         title_suffix = subject
 
-    ax.set_title(
+    fig.suptitle(
         "CSP+LDA frequency relevance\n"
-        f"({title_suffix})"
-    )
-
-    # ----------------------------------------------------------
-    # Legend + grid
-    # ----------------------------------------------------------
-
-    ax.legend(
-        title="Motor-imagery class",
-        loc="upper right",
-    )
-
-    ax.grid(
-        alpha=0.25,
-    )
-
-    # ----------------------------------------------------------
-    # Frequency ticks
-    #
-    # Keep them readable and similar to the SHAP frequency plot.
-    # ----------------------------------------------------------
-
-    ax.set_xticks(
-        np.arange(
-            8,
-            31,
-            2,
-        )
+        f"({title_suffix})",
+        fontsize=15,
     )
 
     # ----------------------------------------------------------
@@ -1191,18 +1134,6 @@ def plot_csp_topographies(
             "channel_relevance must have shape "
             f"{expected_shape}."
         )
-
-    if channel_relevance_std is not None:
-        channel_relevance_std = np.asarray(
-            channel_relevance_std,
-            dtype=np.float64,
-        )
-
-        if channel_relevance_std.shape != expected_shape:
-            raise ValueError(
-                "channel_relevance_std must have shape "
-                f"{expected_shape}."
-            )
 
     if class_counts is not None:
         class_counts = np.asarray(
@@ -1268,29 +1199,13 @@ def plot_csp_topographies(
     # Figure
     # ----------------------------------------------------------
 
-    if channel_relevance_std is None:
-        fig, axes = plt.subplots(
-            2,
-            2,
-            figsize=(11, 9),
-        )
+    fig, axes = plt.subplots(
+        2,
+        2,
+        figsize=(11, 9),
+    )
 
-        mean_axes = axes.flatten()
-        std_axes = None
-
-    else:
-        fig, axes = plt.subplots(
-            2,
-            len(class_names),
-            figsize=(4 * len(class_names), 9),
-        )
-
-        axes = np.asarray(
-            axes
-        )
-
-        mean_axes = axes[0]
-        std_axes = axes[1]
+    mean_axes = axes.flatten()
 
     for class_idx, class_name in enumerate(
         class_names
@@ -1335,39 +1250,41 @@ def plot_csp_topographies(
             pad=10,
         )
 
-        if channel_relevance_std is not None:
-            std_axis = std_axes[class_idx]
-
-            mne.viz.plot_topomap(
-                channel_relevance_std[
-                    class_idx
-                ],
-                info,
-                axes=std_axis,
-                show=False,
-                contours=0,
-                cmap="viridis",
-                vlim=(
-                    vmin,
-                    vmax,
-                ),
-                sensors=True,
-            )
-
-            std_axis.set_title(
-                "SD",
-                fontsize=13,
-                pad=10,
-            )
-
     # ----------------------------------------------------------
     # Title
     # ----------------------------------------------------------
 
-    if subject == "all_mean":
+    if subject == "all_mean_correct":
+        title_suffix = (
+            "correct trials, mean across subjects"
+        )
+
+    elif subject == "all_mean_incorrect":
+        title_suffix = (
+            "incorrect trials, mean across subjects"
+        )
+
+    elif subject == "all_mean":
         title_suffix = (
             "mean across subjects"
         )
+
+    elif subject.endswith(
+        "_correct"
+    ):
+        title_suffix = (
+            "correct trials, "
+            f"{subject.removesuffix('_correct')}"
+        )
+
+    elif subject.endswith(
+        "_incorrect"
+    ):
+        title_suffix = (
+            "incorrect trials, "
+            f"{subject.removesuffix('_incorrect')}"
+        )
+
     else:
         title_suffix = subject
 

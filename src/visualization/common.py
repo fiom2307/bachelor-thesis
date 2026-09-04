@@ -4,6 +4,14 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 
+CLASS_COLORS = {
+    "Left hand": "tab:blue",
+    "Right hand": "tab:orange",
+    "Feet": "tab:green",
+    "Tongue": "tab:red",
+}
+
+
 def save_figure(
     figure: Figure,
     output_file: str | Path,

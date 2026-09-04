@@ -199,6 +199,21 @@ def _get_csp_pattern_plot_path(
     return output_directory / filename
 
 
+def _slugify_name(
+    name: str,
+) -> str:
+    """
+    Convert a display name into a filesystem-friendly slug.
+    """
+    return (
+        name.lower()
+        .replace("+", "")
+        .replace("/", "_")
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+
+
 def get_subject_name(
     subject: int,
 ) -> str:
@@ -1090,52 +1105,71 @@ def get_csp_lda_n_components_accuracy_plot_path() -> Path:
     )
 
 
-def get_csp_lda_temporal_segmented_results_dir() -> Path:
+def get_csp_lda_early_weighted_results_dir() -> Path:
     """
-    Return the CSP+LDA temporal-segmented experiment results directory.
+    Return the CSP+LDA Early-weighted experiment results directory.
     """
     return _create_directory(
         CSP_LDA_EXPERIMENT_RESULTS_DIR
-        / "temporal_segmented"
+        / "early_weighted"
     )
 
 
-def get_csp_lda_temporal_segmented_subject_results_path() -> Path:
+def get_csp_lda_early_weighted_subject_results_path() -> Path:
     """
-    Return the temporal-segmented CSP+LDA subject-wise results CSV path.
+    Return the Early-weighted CSP+LDA subject-wise results CSV path.
     """
     return (
-        get_csp_lda_temporal_segmented_results_dir()
+        get_csp_lda_early_weighted_results_dir()
         / "subject_wise_results.csv"
     )
 
 
-def get_csp_lda_temporal_segmented_class_summary_path() -> Path:
+def get_csp_lda_early_weighted_selected_lambdas_path() -> Path:
     """
-    Return the temporal-segmented CSP+LDA class-wise summary CSV path.
+    Return the Early-weighted CSP+LDA selected lambdas CSV path.
     """
     return (
-        get_csp_lda_temporal_segmented_results_dir()
+        get_csp_lda_early_weighted_results_dir()
+        / "selected_lambdas.csv"
+    )
+
+
+def get_csp_lda_early_weighted_class_summary_path() -> Path:
+    """
+    Return the Early-weighted CSP+LDA class-wise summary CSV path.
+    """
+    return (
+        get_csp_lda_early_weighted_results_dir()
         / "class_wise_summary.csv"
     )
 
 
-def get_csp_lda_temporal_segmented_classification_report_path() -> Path:
+def get_csp_lda_early_weighted_classification_report_path() -> Path:
     """
-    Return the temporal-segmented CSP+LDA pooled report text path.
+    Return the Early-weighted CSP+LDA pooled report text path.
     """
     return (
-        get_csp_lda_temporal_segmented_results_dir()
+        get_csp_lda_early_weighted_results_dir()
         / "pooled_classification_report.txt"
     )
 
 
-def get_csp_lda_temporal_segmented_confusion_matrix_path() -> Path:
+def get_csp_lda_early_weighted_confusion_matrix_path() -> Path:
     """
-    Return the temporal-segmented CSP+LDA pooled confusion matrices CSV path.
+    Return the Early-weighted CSP+LDA pooled confusion matrix CSV path.
     """
     return (
-        get_csp_lda_temporal_segmented_results_dir()
-        / "pooled_confusion_matrices.csv"
+        get_csp_lda_early_weighted_results_dir()
+        / "pooled_confusion_matrix.csv"
     )
 
+
+def get_csp_lda_early_weighted_accuracy_statistics_path() -> Path:
+    """
+    Return the Early-weighted CSP+LDA accuracy Wilcoxon CSV path.
+    """
+    return (
+        get_csp_lda_early_weighted_results_dir()
+        / "accuracy_wilcoxon_statistics.csv"
+    )

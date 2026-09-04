@@ -11,11 +11,12 @@ if str(ROOT_DIR) not in sys.path:
     )
 
 from src.analysis.channel_statistical_analysis import (
+    COMPARISONS,
     run_channel_statistical_analysis,
 )
 from src.utils.paths import (
-    get_channel_statistical_profiles_path,
-    get_channel_statistical_results_path,
+    get_channel_statistical_classwise_results_path,
+    get_channel_statistical_overall_results_path,
 )
 from src.visualization.channel_statistical_analysis import (
     plot_channel_statistical_summaries,
@@ -24,22 +25,28 @@ from src.visualization.channel_statistical_analysis import (
 
 def main() -> None:
     """
-    Run the CSP+LDA channel relevance statistical analysis.
+    Run the channel ROI relevance statistical analysis.
     """
-    _, rows = run_channel_statistical_analysis()
+    _, rows_by_output = run_channel_statistical_analysis()
 
     plot_paths = plot_channel_statistical_summaries(
-        rows
+        rows_by_output
     )
 
     print()
     print("Saved statistical channel analysis:")
-    print(
-        get_channel_statistical_profiles_path()
-    )
-    print(
-        get_channel_statistical_results_path()
-    )
+
+    for comparison in COMPARISONS:
+        print(
+            get_channel_statistical_overall_results_path(
+                comparison.slug
+            )
+        )
+        print(
+            get_channel_statistical_classwise_results_path(
+                comparison.slug
+            )
+        )
 
     for plot_path in plot_paths:
         print(

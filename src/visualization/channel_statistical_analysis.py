@@ -1,65 +1,188 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
 from src.analysis.channel_statistical_analysis import (
     COMPARISONS,
     ChannelStatisticRow,
 )
+from src.data.labels import CLASS_NAMES
 from src.utils.paths import (
-    get_channel_statistical_comparison_plot_path,
+    get_channel_statistical_classwise_plot_path,
+    get_channel_statistical_overall_plot_path,
 )
+from src.visualization.common import save_figure
 
 
 def plot_channel_statistical_summaries(
-    rows: list[ChannelStatisticRow],
+    rows_by_output: dict[str, list[ChannelStatisticRow]],
 ) -> list:
     """
-    Plot one channel relevance summary per comparison.
+    Plot overall.png and classwise.png per channel ROI comparison.
     """
     output_paths = []
 
     for comparison in COMPARISONS:
-        comparison_rows = [
-            row
-            for row in rows
-            if row.comparison_slug == comparison.slug
-        ]
-
-        if not comparison_rows:
-            continue
-
-        output_path = get_channel_statistical_comparison_plot_path(
-            comparison.slug
+        overall_rows = rows_by_output.get(
+            f"{comparison.slug}:overall",
+            [],
         )
 
-        _plot_comparison(
-            rows=comparison_rows,
-            title=comparison.name,
-            left_label=comparison.left_label,
-            right_label=comparison.right_label,
-            output_path=output_path,
+        if overall_rows:
+            output_path = get_channel_statistical_overall_plot_path(
+                comparison.slug
+            )
+
+            _plot_overall_comparison(
+                rows=overall_rows,
+                title=comparison.name,
+                left_label=comparison.left_label,
+                right_label=comparison.right_label,
+                output_path=output_path,
+            )
+
+            output_paths.append(
+                output_path
+            )
+
+        classwise_rows = rows_by_output.get(
+            f"{comparison.slug}:classwise",
+            [],
         )
 
-        output_paths.append(
-            output_path
-        )
+        if classwise_rows:
+            output_path = (
+                get_channel_statistical_classwise_plot_path(
+                    comparison.slug
+                )
+            )
+
+            _plot_classwise_comparison(
+                rows=classwise_rows,
+                title=comparison.name,
+                left_label=comparison.left_label,
+                right_label=comparison.right_label,
+                output_path=output_path,
+            )
+
+            output_paths.append(
+                output_path
+            )
 
     return output_paths
 
 
-def _plot_comparison(
+def _plot_overall_comparison(
     rows: list[ChannelStatisticRow],
     title: str,
     left_label: str,
     right_label: str,
     output_path,
 ) -> None:
-    """
-    Create one channel relevance comparison plot.
-    """
+    figure, axis = plt.subplots(
+        figsize=(8, 5),
+        constrained_layout=True,
+    )
+
+    _plot_rows_on_axis(
+        axis=axis,
+        rows=rows,
+        left_label=left_label,
+        right_label=right_label,
+    )
+
+    axis.set_title(
+        title
+    )
+
+    axis.legend()
+
+    save_figure(
+        figure,
+        output_path,
+    )
+
+    plt.close(
+        figure
+    )
+
+
+def _plot_classwise_comparison(
+    rows: list[ChannelStatisticRow],
+    title: str,
+    left_label: str,
+    right_label: str,
+    output_path,
+) -> None:
+    figure, axes = plt.subplots(
+        2,
+        2,
+        figsize=(12, 8),
+        sharey=True,
+        constrained_layout=True,
+    )
+
+    for axis, class_name in zip(
+        axes.ravel(),
+        CLASS_NAMES,
+        strict=True,
+    ):
+        class_rows = [
+            row
+            for row in rows
+            if row.class_name == class_name
+        ]
+
+        _plot_rows_on_axis(
+            axis=axis,
+            rows=class_rows,
+            left_label=left_label,
+            right_label=right_label,
+        )
+
+        axis.set_title(
+            class_name
+        )
+
+    handles, labels = axes.ravel()[0].get_legend_handles_labels()
+
+    figure.legend(
+        handles,
+        labels,
+        loc="upper center",
+        ncols=2,
+    )
+
+    figure.suptitle(
+        title,
+        y=1.02,
+    )
+
+    save_figure(
+        figure,
+        output_path,
+    )
+
+    plt.close(
+        figure
+    )
+
+
+def _plot_rows_on_axis(
+    axis,
+    rows: list[ChannelStatisticRow],
+    left_label: str,
+    right_label: str,
+) -> None:
+    roi_labels = [
+        row.roi
+        for row in rows
+    ]
+
     x_positions = np.arange(
         len(rows)
     )
+
+    offset = 0.12
 
     left_means = np.asarray(
         [
@@ -93,13 +216,8 @@ def _plot_comparison(
         dtype=np.float64,
     )
 
-    figure, axis = plt.subplots(
-        figsize=(15, 7),
-        constrained_layout=True,
-    )
-
     axis.errorbar(
-        x_positions,
+        x_positions - offset,
         left_means,
         yerr=left_stds,
         marker="o",
@@ -109,7 +227,7 @@ def _plot_comparison(
     )
 
     axis.errorbar(
-        x_positions,
+        x_positions + offset,
         right_means,
         yerr=right_stds,
         marker="o",
@@ -129,11 +247,18 @@ def _plot_comparison(
         ),
     ])
 
-    y_max = float(
-        np.nanmax(
+    if np.any(
+        np.isfinite(
             finite_upper
         )
-    )
+    ):
+        y_max = float(
+            np.nanmax(
+                finite_upper
+            )
+        )
+    else:
+        y_max = 1.0
 
     y_max = max(
         y_max,
@@ -144,22 +269,26 @@ def _plot_comparison(
 
     axis.set_ylim(
         0.0,
-        y_max * 1.18,
+        y_max * 1.28,
     )
 
     for index, row in enumerate(
         rows
     ):
-        if not row.significant_fdr:
+        label = _significance_label(
+            row
+        )
+
+        if not label:
             continue
 
         axis.text(
             index,
-            y_max * 1.08,
-            "*",
+            y_max * 1.13,
+            label,
             ha="center",
             va="bottom",
-            fontsize=14,
+            fontsize=9,
             fontweight="bold",
         )
 
@@ -168,38 +297,39 @@ def _plot_comparison(
     )
 
     axis.set_xticklabels(
-        [
-            row.channel
-            for row in rows
-        ],
-        rotation=45,
+        roi_labels,
+        rotation=20,
         ha="right",
     )
 
     axis.set_xlabel(
-        "EEG channel"
+        "Spatial ROI"
     )
 
     axis.set_ylabel(
         "Mean relative channel relevance"
     )
 
-    axis.set_title(
-        title
-    )
-
-    axis.legend()
-
     axis.grid(
         alpha=0.25,
     )
 
-    figure.savefig(
-        output_path,
-        dpi=300,
-        bbox_inches="tight",
-    )
 
-    plt.close(
-        figure
-    )
+def _significance_label(
+    row: ChannelStatisticRow,
+) -> str:
+    if not np.isfinite(
+        row.p_value_fdr
+    ):
+        return ""
+
+    if row.p_value_fdr < 0.001:
+        return f"***\nq={row.p_value_fdr:.2g}"
+
+    if row.p_value_fdr < 0.01:
+        return f"**\nq={row.p_value_fdr:.2g}"
+
+    if row.p_value_fdr < 0.05:
+        return f"*\nq={row.p_value_fdr:.2g}"
+
+    return f"q={row.p_value_fdr:.2g}"

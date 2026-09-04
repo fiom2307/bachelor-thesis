@@ -24,9 +24,8 @@ from src.models.eegnet import predict_eegnet
 from src.utils.config import N_FOLDS
 from src.utils.paths import (
     get_eegnet_fold_model_path,
-    get_performance_accuracy_statistics_path,
-    get_performance_class_recall_profiles_path,
-    get_performance_class_recall_statistics_path,
+    get_performance_classwise_results_path,
+    get_performance_overall_results_path,
     get_subject_name,
 )
 from src.utils.results import load_accuracy_comparison
@@ -40,20 +39,33 @@ ModelName = Literal[
 
 SUBJECTS = range(1, 10)
 ALPHA = 0.05
+COMPARISON_NAME = "CSP+LDA vs EEGNet"
+COMPARISON_SLUG = "csp_lda_vs_eegnet"
+LEFT_LABEL = "CSP+LDA"
+RIGHT_LABEL = "EEGNet"
 
 
 @dataclass(frozen=True)
-class AccuracyStatisticRow:
+class PerformanceStatisticRow:
+    comparison: str
+    comparison_slug: str
+    scope: str
+    metric: str
     n: int
-    csp_mean: float
-    csp_sd: float
-    csp_median: float
-    eegnet_mean: float
-    eegnet_sd: float
-    eegnet_median: float
+    mean_a: float
+    std_a: float
+    median_a: float
+    mean_b: float
+    std_b: float
+    median_b: float
     mean_difference: float
+    median_difference: float
     wilcoxon_statistic: float
     p_value: float
+    direction: str
+    class_name: str | None = None
+    p_value_fdr: float = np.nan
+    significant_fdr: bool = False
 
 
 @dataclass(frozen=True)
@@ -65,27 +77,10 @@ class SubjectClassRecallProfile:
     recall: float
 
 
-@dataclass(frozen=True)
-class ClassRecallStatisticRow:
-    class_label: int
-    class_name: str
-    n: int
-    csp_mean: float
-    csp_sd: float
-    eegnet_mean: float
-    eegnet_sd: float
-    mean_difference: float
-    wilcoxon_statistic: float
-    p_value: float
-    p_value_fdr: float
-    significant_fdr: bool
-    direction: str
-
-
 def run_performance_statistical_analysis() -> tuple[
-    AccuracyStatisticRow,
+    PerformanceStatisticRow,
     list[SubjectClassRecallProfile],
-    list[ClassRecallStatisticRow],
+    list[PerformanceStatisticRow],
 ]:
     """
     Run paired performance-level tests for CSP+LDA and EEGNet.
@@ -96,14 +91,9 @@ def run_performance_statistical_analysis() -> tuple[
         recall_profiles
     )
 
-    save_accuracy_statistics(
-        accuracy_row
-    )
-    save_class_recall_profiles(
-        recall_profiles
-    )
-    save_class_recall_statistics(
-        recall_rows
+    save_performance_statistics(
+        accuracy_row=accuracy_row,
+        recall_rows=recall_rows,
     )
 
     print_accuracy_statistics(
@@ -120,9 +110,9 @@ def run_performance_statistical_analysis() -> tuple[
     )
 
 
-def compute_accuracy_statistics() -> AccuracyStatisticRow:
+def compute_accuracy_statistics() -> PerformanceStatisticRow:
     """
-    Compute the planned paired Wilcoxon test for subject accuracies.
+    Compute the existing paired Wilcoxon test for subject accuracies.
     """
     results = load_accuracy_comparison()
 
@@ -168,26 +158,12 @@ def compute_accuracy_statistics() -> AccuracyStatisticRow:
         dtype=np.float64,
     )
 
-    differences = (
-        eegnet_values
-        - csp_values
-    )
-
-    statistic, p_value = _paired_wilcoxon(
-        differences
-    )
-
-    return AccuracyStatisticRow(
-        n=len(results),
-        csp_mean=_mean(csp_values),
-        csp_sd=_sample_sd(csp_values),
-        csp_median=_median(csp_values),
-        eegnet_mean=_mean(eegnet_values),
-        eegnet_sd=_sample_sd(eegnet_values),
-        eegnet_median=_median(eegnet_values),
-        mean_difference=_mean(differences),
-        wilcoxon_statistic=statistic,
-        p_value=p_value,
+    return _compute_statistic_row(
+        scope="overall",
+        metric="accuracy",
+        class_name=None,
+        left_values=csp_values,
+        right_values=eegnet_values,
     )
 
 
@@ -200,11 +176,11 @@ def collect_subject_class_recall_profiles() -> list[
     profiles = []
 
     for subject in SUBJECTS:
-        predictions = _load_subject_predictions(
-            subject
+        y_true, csp_predictions, eegnet_predictions = (
+            _load_subject_predictions(
+                subject
+            )
         )
-
-        y_true, csp_predictions, eegnet_predictions = predictions
 
         for class_label, class_name in zip(
             CLASS_LABELS,
@@ -248,9 +224,9 @@ def collect_subject_class_recall_profiles() -> list[
 
 def compute_class_recall_statistics(
     profiles: list[SubjectClassRecallProfile],
-) -> list[ClassRecallStatisticRow]:
+) -> list[PerformanceStatisticRow]:
     """
-    Compute paired Wilcoxon tests per class and FDR-correct them.
+    Compute paired Wilcoxon tests per class and FDR-correct the 4 tests.
     """
     profile_lookup = {
         (
@@ -296,39 +272,21 @@ def compute_class_recall_statistics(
             np.isfinite(csp_values)
             & np.isfinite(eegnet_values)
         )
-        csp_values = csp_values[finite_mask]
-        eegnet_values = eegnet_values[finite_mask]
-        differences = (
-            eegnet_values
-            - csp_values
-        )
 
-        statistic, p_value = _paired_wilcoxon(
-            differences
-        )
-
-        p_values.append(
-            p_value
+        row = _compute_statistic_row(
+            scope="classwise",
+            metric="recall",
+            class_name=class_display_name,
+            left_values=csp_values[finite_mask],
+            right_values=eegnet_values[finite_mask],
         )
 
         rows.append(
-            ClassRecallStatisticRow(
-                class_label=class_label,
-                class_name=class_display_name,
-                n=len(differences),
-                csp_mean=_mean(csp_values),
-                csp_sd=_sample_sd(csp_values),
-                eegnet_mean=_mean(eegnet_values),
-                eegnet_sd=_sample_sd(eegnet_values),
-                mean_difference=_mean(differences),
-                wilcoxon_statistic=statistic,
-                p_value=p_value,
-                p_value_fdr=np.nan,
-                significant_fdr=False,
-                direction=_direction_label(
-                    _mean(differences)
-                ),
-            )
+            row
+        )
+
+        p_values.append(
+            row.p_value
         )
 
     corrected_p_values, significant = _fdr_correct(
@@ -336,15 +294,21 @@ def compute_class_recall_statistics(
     )
 
     return [
-        ClassRecallStatisticRow(
-            class_label=row.class_label,
+        PerformanceStatisticRow(
+            comparison=row.comparison,
+            comparison_slug=row.comparison_slug,
+            scope=row.scope,
             class_name=row.class_name,
+            metric=row.metric,
             n=row.n,
-            csp_mean=row.csp_mean,
-            csp_sd=row.csp_sd,
-            eegnet_mean=row.eegnet_mean,
-            eegnet_sd=row.eegnet_sd,
+            mean_a=row.mean_a,
+            std_a=row.std_a,
+            median_a=row.median_a,
+            mean_b=row.mean_b,
+            std_b=row.std_b,
+            median_b=row.median_b,
             mean_difference=row.mean_difference,
+            median_difference=row.median_difference,
             wilcoxon_statistic=row.wilcoxon_statistic,
             p_value=row.p_value,
             p_value_fdr=p_value_fdr,
@@ -360,18 +324,43 @@ def compute_class_recall_statistics(
     ]
 
 
+def save_performance_statistics(
+    accuracy_row: PerformanceStatisticRow,
+    recall_rows: list[PerformanceStatisticRow],
+) -> list[Path]:
+    """
+    Save overall_statistics.csv and classwise_statistics.csv.
+    """
+    overall_path = save_accuracy_statistics(
+        accuracy_row
+    )
+    classwise_path = save_class_recall_statistics(
+        recall_rows
+    )
+
+    return [
+        overall_path,
+        classwise_path,
+    ]
+
+
 def save_accuracy_statistics(
-    row: AccuracyStatisticRow,
+    row: PerformanceStatisticRow,
     output_file: str | Path | None = None,
 ) -> Path:
     """
     Save the overall accuracy statistical test result.
     """
     if output_file is None:
-        output_file = get_performance_accuracy_statistics_path()
+        output_file = get_performance_overall_results_path()
 
     output_file = Path(
         output_file
+    )
+
+    output_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     with output_file.open(
@@ -383,95 +372,68 @@ def save_accuracy_statistics(
             file,
             fieldnames=[
                 "comparison",
+                "scope",
+                "metric",
                 "n",
-                "csp_mean",
-                "csp_sd",
-                "csp_median",
-                "eegnet_mean",
-                "eegnet_sd",
-                "eegnet_median",
+                "mean_a",
+                "std_a",
+                "median_a",
+                "mean_b",
+                "std_b",
+                "median_b",
                 "mean_difference",
+                "median_difference",
                 "wilcoxon_statistic",
                 "p_value",
+                "direction",
             ],
         )
 
         writer.writeheader()
         writer.writerow({
-            "comparison": "CSP+LDA vs EEGNet accuracy",
+            "comparison": row.comparison,
+            "scope": row.scope,
+            "metric": row.metric,
             "n": row.n,
-            "csp_mean": _format_float(row.csp_mean),
-            "csp_sd": _format_float(row.csp_sd),
-            "csp_median": _format_float(row.csp_median),
-            "eegnet_mean": _format_float(row.eegnet_mean),
-            "eegnet_sd": _format_float(row.eegnet_sd),
-            "eegnet_median": _format_float(row.eegnet_median),
+            "mean_a": _format_float(row.mean_a),
+            "std_a": _format_float(row.std_a),
+            "median_a": _format_float(row.median_a),
+            "mean_b": _format_float(row.mean_b),
+            "std_b": _format_float(row.std_b),
+            "median_b": _format_float(row.median_b),
             "mean_difference": _format_float(
                 row.mean_difference
+            ),
+            "median_difference": _format_float(
+                row.median_difference
             ),
             "wilcoxon_statistic": _format_float(
                 row.wilcoxon_statistic
             ),
             "p_value": _format_float(row.p_value),
+            "direction": row.direction,
         })
 
     return output_file
 
 
-def save_class_recall_profiles(
-    profiles: list[SubjectClassRecallProfile],
-    output_file: str | Path | None = None,
-) -> Path:
-    """
-    Save subject-level class-wise recall values.
-    """
-    if output_file is None:
-        output_file = get_performance_class_recall_profiles_path()
-
-    output_file = Path(
-        output_file
-    )
-
-    with output_file.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as file:
-        writer = csv.writer(
-            file
-        )
-        writer.writerow([
-            "subject",
-            "class_label",
-            "class_name",
-            "model",
-            "recall",
-        ])
-
-        for profile in profiles:
-            writer.writerow([
-                get_subject_name(profile.subject),
-                profile.class_label,
-                profile.class_name,
-                profile.model,
-                _format_float(profile.recall),
-            ])
-
-    return output_file
-
-
 def save_class_recall_statistics(
-    rows: list[ClassRecallStatisticRow],
+    rows: list[PerformanceStatisticRow],
     output_file: str | Path | None = None,
 ) -> Path:
     """
     Save class-wise recall statistical test results.
     """
     if output_file is None:
-        output_file = get_performance_class_recall_statistics_path()
+        output_file = get_performance_classwise_results_path()
 
     output_file = Path(
         output_file
+    )
+
+    output_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     with output_file.open(
@@ -482,14 +444,19 @@ def save_class_recall_statistics(
         writer = csv.DictWriter(
             file,
             fieldnames=[
-                "class_label",
-                "class_name",
+                "comparison",
+                "scope",
+                "class",
+                "metric",
                 "n",
-                "csp_mean",
-                "csp_sd",
-                "eegnet_mean",
-                "eegnet_sd",
+                "mean_a",
+                "std_a",
+                "median_a",
+                "mean_b",
+                "std_b",
+                "median_b",
                 "mean_difference",
+                "median_difference",
                 "wilcoxon_statistic",
                 "p_value",
                 "p_value_fdr",
@@ -502,21 +469,30 @@ def save_class_recall_statistics(
 
         for row in rows:
             writer.writerow({
-                "class_label": row.class_label,
-                "class_name": row.class_name,
+                "comparison": row.comparison,
+                "scope": row.scope,
+                "class": row.class_name,
+                "metric": row.metric,
                 "n": row.n,
-                "csp_mean": _format_float(row.csp_mean),
-                "csp_sd": _format_float(row.csp_sd),
-                "eegnet_mean": _format_float(row.eegnet_mean),
-                "eegnet_sd": _format_float(row.eegnet_sd),
+                "mean_a": _format_float(row.mean_a),
+                "std_a": _format_float(row.std_a),
+                "median_a": _format_float(row.median_a),
+                "mean_b": _format_float(row.mean_b),
+                "std_b": _format_float(row.std_b),
+                "median_b": _format_float(row.median_b),
                 "mean_difference": _format_float(
                     row.mean_difference
+                ),
+                "median_difference": _format_float(
+                    row.median_difference
                 ),
                 "wilcoxon_statistic": _format_float(
                     row.wilcoxon_statistic
                 ),
                 "p_value": _format_float(row.p_value),
-                "p_value_fdr": _format_float(row.p_value_fdr),
+                "p_value_fdr": _format_float(
+                    row.p_value_fdr
+                ),
                 "significant_fdr": row.significant_fdr,
                 "direction": row.direction,
             })
@@ -525,7 +501,7 @@ def save_class_recall_statistics(
 
 
 def print_accuracy_statistics(
-    row: AccuracyStatisticRow,
+    row: PerformanceStatisticRow,
 ) -> None:
     """
     Print a concise summary of the overall accuracy comparison.
@@ -535,19 +511,19 @@ def print_accuracy_statistics(
     print("Overall accuracy comparison")
     print("=" * 70)
     print(
-        "CSP+LDA: "
-        f"mean={row.csp_mean:.4f}, "
-        f"SD={row.csp_sd:.4f}, "
-        f"median={row.csp_median:.4f}"
+        f"{LEFT_LABEL}: "
+        f"mean={row.mean_a:.4f}, "
+        f"SD={row.std_a:.4f}, "
+        f"median={row.median_a:.4f}"
     )
     print(
-        "EEGNet:  "
-        f"mean={row.eegnet_mean:.4f}, "
-        f"SD={row.eegnet_sd:.4f}, "
-        f"median={row.eegnet_median:.4f}"
+        f"{RIGHT_LABEL}:  "
+        f"mean={row.mean_b:.4f}, "
+        f"SD={row.std_b:.4f}, "
+        f"median={row.median_b:.4f}"
     )
     print(
-        "EEGNet - CSP+LDA: "
+        f"{LEFT_LABEL} - {RIGHT_LABEL}: "
         f"mean difference={row.mean_difference:.4f}, "
         f"W={row.wilcoxon_statistic:.4g}, "
         f"p={row.p_value:.4g}"
@@ -555,7 +531,7 @@ def print_accuracy_statistics(
 
 
 def print_class_recall_statistics(
-    rows: list[ClassRecallStatisticRow],
+    rows: list[PerformanceStatisticRow],
 ) -> None:
     """
     Print a concise class-wise recall comparison.
@@ -567,9 +543,9 @@ def print_class_recall_statistics(
     print(
         f"{'Class':<12} "
         f"{'n':>2} "
-        f"{'CSP mean+/-SD':<18} "
-        f"{'EEGNet mean+/-SD':<21} "
-        f"{'Delta':>8} "
+        f"{LEFT_LABEL + ' mean+/-SD':<20} "
+        f"{RIGHT_LABEL + ' mean+/-SD':<21} "
+        f"{'A-B':>8} "
         f"{'W':>8} "
         f"{'p':>10} "
         f"{'p_FDR':>10} "
@@ -581,8 +557,8 @@ def print_class_recall_statistics(
         print(
             f"{row.class_name:<12} "
             f"{row.n:>2} "
-            f"{_mean_sd(row.csp_mean, row.csp_sd):<18} "
-            f"{_mean_sd(row.eegnet_mean, row.eegnet_sd):<21} "
+            f"{_mean_sd(row.mean_a, row.std_a):<20} "
+            f"{_mean_sd(row.mean_b, row.std_b):<21} "
             f"{row.mean_difference:>8.4f} "
             f"{row.wilcoxon_statistic:>8.4g} "
             f"{row.p_value:>10.4g} "
@@ -590,6 +566,51 @@ def print_class_recall_statistics(
             f"{str(row.significant_fdr):>5} "
             f"{row.direction}"
         )
+
+
+def _compute_statistic_row(
+    scope: str,
+    metric: str,
+    class_name: str | None,
+    left_values: np.ndarray,
+    right_values: np.ndarray,
+) -> PerformanceStatisticRow:
+    differences = (
+        left_values
+        - right_values
+    )
+
+    statistic, p_value = _paired_wilcoxon(
+        differences
+    )
+
+    mean_difference = _mean(
+        differences
+    )
+
+    return PerformanceStatisticRow(
+        comparison=COMPARISON_NAME,
+        comparison_slug=COMPARISON_SLUG,
+        scope=scope,
+        class_name=class_name,
+        metric=metric,
+        n=len(differences),
+        mean_a=_mean(left_values),
+        std_a=_sample_sd(left_values),
+        median_a=_median(left_values),
+        mean_b=_mean(right_values),
+        std_b=_sample_sd(right_values),
+        median_b=_median(right_values),
+        mean_difference=mean_difference,
+        median_difference=_median(
+            differences
+        ),
+        wilcoxon_statistic=statistic,
+        p_value=p_value,
+        direction=_direction_label(
+            mean_difference
+        ),
+    )
 
 
 def _load_subject_predictions(
@@ -760,7 +781,8 @@ def _paired_wilcoxon(
         return 0.0, 1.0
 
     statistic, p_value = wilcoxon(
-        differences
+        differences,
+        alternative="two-sided",
     )
 
     return (
@@ -813,12 +835,12 @@ def _direction_label(
         return "not available"
 
     if mean_difference > 0:
-        return "EEGNet > CSP+LDA"
+        return f"{LEFT_LABEL} > {RIGHT_LABEL}"
 
     if mean_difference < 0:
-        return "EEGNet < CSP+LDA"
+        return f"{LEFT_LABEL} < {RIGHT_LABEL}"
 
-    return "EEGNet = CSP+LDA"
+    return f"{LEFT_LABEL} = {RIGHT_LABEL}"
 
 
 def _display_class_name(

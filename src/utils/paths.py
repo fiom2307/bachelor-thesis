@@ -845,35 +845,71 @@ def get_frequency_statistical_analysis_dir() -> Path:
     )
 
 
-def get_frequency_statistical_profiles_path() -> Path:
-    """
-    Return the subject-level frequency profile CSV path.
-    """
-    return (
-        get_frequency_statistical_analysis_dir()
-        / "frequency_relevance_profiles.csv"
-    )
-
-
-def get_frequency_statistical_results_path() -> Path:
-    """
-    Return the frequency statistical test CSV path.
-    """
-    return (
-        get_frequency_statistical_analysis_dir()
-        / "frequency_relevance_statistics.csv"
-    )
-
-
-def get_frequency_statistical_plot_path(
+def get_frequency_statistical_comparison_dir(
     comparison_slug: str,
 ) -> Path:
     """
-    Return one frequency statistical comparison plot path.
+    Return one frequency statistical comparison directory.
+    """
+    return _create_directory(
+        get_frequency_statistical_analysis_dir()
+        / comparison_slug
+    )
+
+
+def get_frequency_statistical_overall_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall frequency statistical CSV path.
     """
     return (
-        get_frequency_statistical_analysis_dir()
-        / f"{comparison_slug}.png"
+        get_frequency_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall_statistics.csv"
+    )
+
+
+def get_frequency_statistical_classwise_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise frequency statistical CSV path.
+    """
+    return (
+        get_frequency_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise_statistics.csv"
+    )
+
+
+def get_frequency_statistical_overall_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall frequency statistical plot path.
+    """
+    return (
+        get_frequency_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall.png"
+    )
+
+
+def get_frequency_statistical_classwise_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise frequency statistical plot path.
+    """
+    return (
+        get_frequency_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise.png"
     )
 
 
@@ -887,119 +923,71 @@ def get_temporal_statistical_analysis_dir() -> Path:
     )
 
 
-def get_temporal_statistical_profiles_path() -> Path:
-    """
-    Return the subject-level temporal profile CSV path.
-    """
-    return (
-        get_temporal_statistical_analysis_dir()
-        / "temporal_relevance_profiles.csv"
-    )
-
-
-def get_temporal_statistical_results_path() -> Path:
-    """
-    Return the temporal statistical test CSV path.
-    """
-    return (
-        get_temporal_statistical_analysis_dir()
-        / "temporal_relevance_statistics.csv"
-    )
-
-
-def get_temporal_statistical_plot_path(
+def get_temporal_statistical_comparison_dir(
     comparison_slug: str,
 ) -> Path:
     """
-    Return one temporal statistical comparison plot path.
+    Return one temporal statistical comparison directory.
     """
-    return (
+    return _create_directory(
         get_temporal_statistical_analysis_dir()
-        / f"{comparison_slug}.png"
+        / comparison_slug
     )
 
 
-def get_temporal_classwise_statistical_results_path() -> Path:
-    """
-    Return the class-wise temporal statistical test CSV path.
-    """
-    return (
-        get_temporal_statistical_analysis_dir()
-        / "csp_lda_classwise_correct_vs_incorrect_statistics.csv"
-    )
-
-
-def get_temporal_classwise_statistical_plot_path(
-    class_slug: str,
+def get_temporal_statistical_overall_results_path(
+    comparison_slug: str,
 ) -> Path:
     """
-    Return one class-wise temporal statistical summary plot path.
+    Return one overall temporal statistical CSV path.
     """
     return (
-        get_temporal_statistical_analysis_dir()
-        / f"csp_lda_{class_slug}_correct_vs_incorrect.png"
+        get_temporal_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall_statistics.csv"
     )
 
 
-def get_temporal_classwise_csp_vs_eegnet_correct_results_path() -> Path:
-    """
-    Return the class-wise CSP+LDA vs EEGNet correct-trial CSV path.
-    """
-    return (
-        get_temporal_statistical_analysis_dir()
-        / "classwise_csp_lda_correct_vs_eegnet_correct_statistics.csv"
-    )
-
-
-def get_temporal_classwise_csp_vs_eegnet_correct_plot_path(
-    class_slug: str,
+def get_temporal_statistical_classwise_results_path(
+    comparison_slug: str,
 ) -> Path:
     """
-    Return one class-wise CSP+LDA vs EEGNet correct-trial plot path.
+    Return one class-wise temporal statistical CSV path.
     """
     return (
-        get_temporal_statistical_analysis_dir()
-        / f"classwise_{class_slug}_csp_lda_correct_vs_eegnet_correct.png"
+        get_temporal_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise_statistics.csv"
     )
 
 
-def get_temporal_left_hand_early_gee_trials_path() -> Path:
+def get_temporal_statistical_overall_plot_path(
+    comparison_slug: str,
+) -> Path:
     """
-    Return the Left-Hand early-relevance GEE trial-level CSV path.
+    Return one overall temporal statistical plot path.
     """
     return (
-        get_temporal_statistical_analysis_dir()
-        / "csp_lda_left_hand_early_relevance_gee_trials.csv"
+        get_temporal_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall.png"
     )
 
 
-def get_temporal_left_hand_early_gee_results_path() -> Path:
+def get_temporal_statistical_classwise_plot_path(
+    comparison_slug: str,
+) -> Path:
     """
-    Return the Left-Hand early-relevance GEE result CSV path.
-    """
-    return (
-        get_temporal_statistical_analysis_dir()
-        / "csp_lda_left_hand_early_relevance_gee_results.csv"
-    )
-
-
-def get_temporal_csp_lda_right_hand_early_late_gee_trials_path() -> Path:
-    """
-    Return the CSP+LDA Right-Hand Early/Late contrast GEE trials CSV path.
+    Return one class-wise temporal statistical plot path.
     """
     return (
-        get_temporal_statistical_analysis_dir()
-        / "csp_lda_right_hand_early_late_contrast_gee_trials.csv"
-    )
-
-
-def get_temporal_csp_lda_right_hand_early_late_gee_results_path() -> Path:
-    """
-    Return the CSP+LDA Right-Hand Early/Late contrast GEE result CSV path.
-    """
-    return (
-        get_temporal_statistical_analysis_dir()
-        / "csp_lda_right_hand_early_late_contrast_gee_results.csv"
+        get_temporal_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise.png"
     )
 
 
@@ -1013,35 +1001,71 @@ def get_channel_statistical_analysis_dir() -> Path:
     )
 
 
-def get_channel_statistical_profiles_path() -> Path:
-    """
-    Return the subject-level channel profile CSV path.
-    """
-    return (
-        get_channel_statistical_analysis_dir()
-        / "channel_relevance_profiles.csv"
-    )
-
-
-def get_channel_statistical_results_path() -> Path:
-    """
-    Return the channel statistical test CSV path.
-    """
-    return (
-        get_channel_statistical_analysis_dir()
-        / "channel_relevance_statistics.csv"
-    )
-
-
-def get_channel_statistical_comparison_plot_path(
+def get_channel_statistical_comparison_dir(
     comparison_slug: str,
 ) -> Path:
     """
-    Return one channel statistical comparison plot path.
+    Return one channel statistical comparison directory.
+    """
+    return _create_directory(
+        get_channel_statistical_analysis_dir()
+        / comparison_slug
+    )
+
+
+def get_channel_statistical_overall_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall channel statistical CSV path.
     """
     return (
-        get_channel_statistical_analysis_dir()
-        / f"{comparison_slug}.png"
+        get_channel_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall_statistics.csv"
+    )
+
+
+def get_channel_statistical_classwise_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise channel statistical CSV path.
+    """
+    return (
+        get_channel_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise_statistics.csv"
+    )
+
+
+def get_channel_statistical_overall_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall channel statistical plot path.
+    """
+    return (
+        get_channel_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall.png"
+    )
+
+
+def get_channel_statistical_classwise_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise channel statistical plot path.
+    """
+    return (
+        get_channel_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise.png"
     )
 
 
@@ -1055,33 +1079,53 @@ def get_performance_statistical_analysis_dir() -> Path:
     )
 
 
-def get_performance_accuracy_statistics_path() -> Path:
+def get_performance_comparison_dir() -> Path:
     """
-    Return the overall accuracy statistical test CSV path.
+    Return the CSP+LDA vs EEGNet performance comparison directory.
     """
-    return (
+    return _create_directory(
         get_performance_statistical_analysis_dir()
-        / "accuracy_statistics.csv"
+        / "csp_lda_vs_eegnet"
     )
 
 
-def get_performance_class_recall_profiles_path() -> Path:
+def get_performance_overall_results_path() -> Path:
     """
-    Return the subject-level class recall profile CSV path.
+    Return the overall performance statistical CSV path.
     """
     return (
-        get_performance_statistical_analysis_dir()
-        / "class_recall_profiles.csv"
+        get_performance_comparison_dir()
+        / "overall_statistics.csv"
     )
 
 
-def get_performance_class_recall_statistics_path() -> Path:
+def get_performance_classwise_results_path() -> Path:
     """
-    Return the class-wise recall statistical test CSV path.
+    Return the class-wise performance statistical CSV path.
     """
     return (
-        get_performance_statistical_analysis_dir()
-        / "class_recall_statistics.csv"
+        get_performance_comparison_dir()
+        / "classwise_statistics.csv"
+    )
+
+
+def get_performance_overall_plot_path() -> Path:
+    """
+    Return the overall performance statistical plot path.
+    """
+    return (
+        get_performance_comparison_dir()
+        / "overall.png"
+    )
+
+
+def get_performance_classwise_plot_path() -> Path:
+    """
+    Return the class-wise performance statistical plot path.
+    """
+    return (
+        get_performance_comparison_dir()
+        / "classwise.png"
     )
 
 
@@ -1102,74 +1146,4 @@ def get_csp_lda_n_components_accuracy_plot_path() -> Path:
     return (
         CSP_LDA_EXPERIMENT_RESULTS_DIR
         / "n_components_accuracy_comparison.png"
-    )
-
-
-def get_csp_lda_early_weighted_results_dir() -> Path:
-    """
-    Return the CSP+LDA Early-weighted experiment results directory.
-    """
-    return _create_directory(
-        CSP_LDA_EXPERIMENT_RESULTS_DIR
-        / "early_weighted"
-    )
-
-
-def get_csp_lda_early_weighted_subject_results_path() -> Path:
-    """
-    Return the Early-weighted CSP+LDA subject-wise results CSV path.
-    """
-    return (
-        get_csp_lda_early_weighted_results_dir()
-        / "subject_wise_results.csv"
-    )
-
-
-def get_csp_lda_early_weighted_selected_lambdas_path() -> Path:
-    """
-    Return the Early-weighted CSP+LDA selected lambdas CSV path.
-    """
-    return (
-        get_csp_lda_early_weighted_results_dir()
-        / "selected_lambdas.csv"
-    )
-
-
-def get_csp_lda_early_weighted_class_summary_path() -> Path:
-    """
-    Return the Early-weighted CSP+LDA class-wise summary CSV path.
-    """
-    return (
-        get_csp_lda_early_weighted_results_dir()
-        / "class_wise_summary.csv"
-    )
-
-
-def get_csp_lda_early_weighted_classification_report_path() -> Path:
-    """
-    Return the Early-weighted CSP+LDA pooled report text path.
-    """
-    return (
-        get_csp_lda_early_weighted_results_dir()
-        / "pooled_classification_report.txt"
-    )
-
-
-def get_csp_lda_early_weighted_confusion_matrix_path() -> Path:
-    """
-    Return the Early-weighted CSP+LDA pooled confusion matrix CSV path.
-    """
-    return (
-        get_csp_lda_early_weighted_results_dir()
-        / "pooled_confusion_matrix.csv"
-    )
-
-
-def get_csp_lda_early_weighted_accuracy_statistics_path() -> Path:
-    """
-    Return the Early-weighted CSP+LDA accuracy Wilcoxon CSV path.
-    """
-    return (
-        get_csp_lda_early_weighted_results_dir()
-        / "accuracy_wilcoxon_statistics.csv"
     )

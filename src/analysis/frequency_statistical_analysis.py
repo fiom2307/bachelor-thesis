@@ -19,15 +19,15 @@ from src.analysis.shap_analysis import (
     load_frequency_domain_shap_result,
 )
 from src.analysis.shap_analysis.frequency_domain.shap_analysis import (
-    FREQUENCY_BANDS,
+    FREQUENCY_BANDS as EEGNET_SOURCE_FREQUENCY_BANDS,
 )
 from src.data.dataset import get_data_for_subject
-from src.data.labels import CLASS_LABELS
+from src.data.labels import CLASS_LABELS, CLASS_NAMES
 from src.utils.paths import (
     get_csp_fold_model_path,
     get_frequency_domain_shap_values_path,
-    get_frequency_statistical_profiles_path,
-    get_frequency_statistical_results_path,
+    get_frequency_statistical_classwise_results_path,
+    get_frequency_statistical_overall_results_path,
     get_lda_fold_model_path,
     get_subject_name,
 )
@@ -51,13 +51,28 @@ FMIN = 8.0
 FMAX = 30.0
 ALPHA = 0.05
 
+STATISTICAL_FREQUENCY_BANDS: tuple[
+    tuple[str, float, float],
+    ...,
+] = (
+    ("Mu", 8.0, 13.0),
+    ("Low beta", 13.0, 20.0),
+    ("High beta", 20.0, 30.0),
+)
+
 
 @dataclass(frozen=True)
 class SubjectFrequencyProfile:
     subject: int
     model: ModelName
     condition: TrialSelection
-    values: np.ndarray
+    class_values: np.ndarray
+
+    @property
+    def values(self) -> np.ndarray:
+        return _class_balanced_relative_profile(
+            self.class_values
+        )
 
 
 @dataclass(frozen=True)
@@ -68,7 +83,6 @@ class FrequencyComparison:
     right_label: str
     left_key: tuple[ModelName, TrialSelection]
     right_key: tuple[ModelName, TrialSelection]
-    difference_label: str
 
 
 @dataclass(frozen=True)
@@ -92,6 +106,7 @@ class FrequencyStatisticRow:
     p_value_fdr: float
     significant_fdr: bool
     direction: str
+    class_name: str | None = None
 
 
 COMPARISONS: tuple[
@@ -99,65 +114,60 @@ COMPARISONS: tuple[
     ...,
 ] = (
     FrequencyComparison(
-        name="CSP+LDA CORRECT vs EEGNet CORRECT",
+        name="CSP+LDA correct vs EEGNet correct",
         slug="csp_lda_correct_vs_eegnet_correct",
-        left_label="CSP correct",
+        left_label="CSP+LDA correct",
         right_label="EEGNet correct",
         left_key=("csp", "correct"),
         right_key=("eegnet", "correct"),
-        difference_label="EEGNet correct - CSP correct",
     ),
     FrequencyComparison(
-        name="EEGNet CORRECT vs EEGNet INCORRECT",
-        slug="eegnet_correct_vs_eegnet_incorrect",
-        left_label="EEGNet incorrect",
-        right_label="EEGNet correct",
-        left_key=("eegnet", "incorrect"),
-        right_key=("eegnet", "correct"),
-        difference_label="EEGNet correct - EEGNet incorrect",
-    ),
-    FrequencyComparison(
-        name="CSP+LDA CORRECT vs CSP+LDA INCORRECT",
+        name="CSP+LDA correct vs CSP+LDA incorrect",
         slug="csp_lda_correct_vs_csp_lda_incorrect",
-        left_label="CSP incorrect",
-        right_label="CSP correct",
-        left_key=("csp", "incorrect"),
-        right_key=("csp", "correct"),
-        difference_label="CSP correct - CSP incorrect",
+        left_label="CSP+LDA correct",
+        right_label="CSP+LDA incorrect",
+        left_key=("csp", "correct"),
+        right_key=("csp", "incorrect"),
+    ),
+    FrequencyComparison(
+        name="EEGNet correct vs EEGNet incorrect",
+        slug="eegnet_correct_vs_eegnet_incorrect",
+        left_label="EEGNet correct",
+        right_label="EEGNet incorrect",
+        left_key=("eegnet", "correct"),
+        right_key=("eegnet", "incorrect"),
     ),
 )
 
 
 def run_frequency_statistical_analysis() -> tuple[
     list[SubjectFrequencyProfile],
-    list[FrequencyStatisticRow],
+    dict[str, list[FrequencyStatisticRow]],
 ]:
     """
-    Run the subject-level frequency relevance statistical analysis.
+    Run subject-level frequency relevance statistics.
     """
     profiles = collect_subject_frequency_profiles()
-    rows = compute_frequency_statistics(profiles)
-
-    save_frequency_profiles(
+    rows_by_output = compute_frequency_statistics(
         profiles
     )
 
     save_frequency_statistics(
-        rows
+        rows_by_output
     )
 
     print_frequency_statistics(
-        rows
+        rows_by_output
     )
 
-    return profiles, rows
+    return profiles, rows_by_output
 
 
 def collect_subject_frequency_profiles() -> list[
     SubjectFrequencyProfile
 ]:
     """
-    Build one class-balanced relative profile per subject/model/condition.
+    Build class-wise relative profiles per subject/model/condition.
     """
     profiles = []
 
@@ -179,293 +189,282 @@ def collect_subject_frequency_profiles() -> list[
 
 def compute_frequency_statistics(
     profiles: list[SubjectFrequencyProfile],
-) -> list[FrequencyStatisticRow]:
+) -> dict[str, list[FrequencyStatisticRow]]:
     """
-    Compute paired Wilcoxon tests and descriptive statistics per band.
+    Compute overall and class-wise Wilcoxon tests for each comparison.
     """
     profile_lookup = {
         (
             profile.subject,
             profile.model,
             profile.condition,
-        ): profile.values
+        ): profile
         for profile in profiles
     }
 
-    rows = []
+    rows_by_output = {}
 
     for comparison in COMPARISONS:
-        comparison_rows = []
-        raw_p_values = []
-
-        for band_index, (band_low, band_high) in enumerate(
-            FREQUENCY_BANDS
-        ):
-            left_values, right_values = _paired_band_values(
-                profile_lookup=profile_lookup,
-                comparison=comparison,
-                band_index=band_index,
-            )
-
-            differences = (
-                right_values
-                - left_values
-            )
-
-            statistic, p_value = _paired_wilcoxon(
-                differences
-            )
-
-            raw_p_values.append(
-                p_value
-            )
-
-            comparison_rows.append(
-                FrequencyStatisticRow(
-                    comparison=comparison.name,
-                    comparison_slug=comparison.slug,
-                    frequency_band=_format_band(
-                        band_low,
-                        band_high,
-                    ),
-                    band_low=band_low,
-                    band_high=band_high,
-                    n=len(differences),
-                    mean_a=_nanmean(left_values),
-                    std_a=_nanstd(left_values),
-                    median_a=_nanmedian(left_values),
-                    mean_b=_nanmean(right_values),
-                    std_b=_nanstd(right_values),
-                    median_b=_nanmedian(right_values),
-                    mean_difference=_nanmean(differences),
-                    median_difference=_nanmedian(differences),
-                    wilcoxon_statistic=statistic,
-                    p_value=p_value,
-                    p_value_fdr=np.nan,
-                    significant_fdr=False,
-                    direction=_direction_label(
-                        comparison=comparison,
-                        mean_difference=_nanmean(
-                            differences
-                        ),
-                    ),
-                )
-            )
-
-        corrected_p_values, significant = _fdr_correct(
-            raw_p_values
+        overall_rows = _compute_overall_statistics(
+            profile_lookup=profile_lookup,
+            comparison=comparison,
         )
 
-        for row, p_value_fdr, is_significant in zip(
-            comparison_rows,
-            corrected_p_values,
-            significant,
-            strict=True,
-        ):
-            rows.append(
-                FrequencyStatisticRow(
-                    comparison=row.comparison,
-                    comparison_slug=row.comparison_slug,
-                    frequency_band=row.frequency_band,
-                    band_low=row.band_low,
-                    band_high=row.band_high,
-                    n=row.n,
-                    mean_a=row.mean_a,
-                    std_a=row.std_a,
-                    median_a=row.median_a,
-                    mean_b=row.mean_b,
-                    std_b=row.std_b,
-                    median_b=row.median_b,
-                    mean_difference=row.mean_difference,
-                    median_difference=row.median_difference,
-                    wilcoxon_statistic=(
-                        row.wilcoxon_statistic
-                    ),
-                    p_value=row.p_value,
-                    p_value_fdr=p_value_fdr,
-                    significant_fdr=bool(
-                        is_significant
-                    ),
-                    direction=row.direction,
-                )
-            )
-
-    return rows
-
-
-def save_frequency_profiles(
-    profiles: list[SubjectFrequencyProfile],
-    output_file: str | Path | None = None,
-) -> Path:
-    """
-    Save subject-level class-balanced relative profiles.
-    """
-    if output_file is None:
-        output_file = get_frequency_statistical_profiles_path()
-
-    output_file = Path(
-        output_file
-    )
-
-    with output_file.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as file:
-        writer = csv.writer(
-            file
+        classwise_rows = _compute_classwise_statistics(
+            profile_lookup=profile_lookup,
+            comparison=comparison,
         )
 
-        writer.writerow([
-            "subject",
-            "model",
-            "condition",
-            "frequency_band",
-            "relative_relevance",
-        ])
-
-        for profile in profiles:
-            subject_name = get_subject_name(
-                profile.subject
+        rows_by_output[
+            _overall_output_key(
+                comparison
             )
+        ] = overall_rows
 
-            for band, value in zip(
-                FREQUENCY_BANDS,
-                profile.values,
-                strict=True,
-            ):
-                writer.writerow([
-                    subject_name,
-                    profile.model,
-                    profile.condition,
-                    _format_band(*band),
-                    _format_float(value),
-                ])
+        rows_by_output[
+            _classwise_output_key(
+                comparison
+            )
+        ] = classwise_rows
 
-    return output_file
+    return rows_by_output
 
 
 def save_frequency_statistics(
-    rows: list[FrequencyStatisticRow],
-    output_file: str | Path | None = None,
-) -> Path:
+    rows_by_output: dict[str, list[FrequencyStatisticRow]],
+) -> list[Path]:
     """
-    Save statistical test results.
+    Save overall_statistics.csv and classwise_statistics.csv per comparison.
     """
-    if output_file is None:
-        output_file = get_frequency_statistical_results_path()
+    output_paths = []
 
-    output_file = Path(
-        output_file
-    )
-
-    with output_file.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as file:
-        writer = csv.DictWriter(
-            file,
-            fieldnames=[
-                "comparison",
-                "frequency_band",
-                "n",
-                "mean_a",
-                "std_a",
-                "median_a",
-                "mean_b",
-                "std_b",
-                "median_b",
-                "mean_difference",
-                "median_difference",
-                "wilcoxon_statistic",
-                "p_value",
-                "p_value_fdr",
-                "significant_fdr",
-                "direction",
-            ],
+    for comparison in COMPARISONS:
+        overall_path = get_frequency_statistical_overall_results_path(
+            comparison.slug
         )
 
-        writer.writeheader()
+        _save_frequency_statistics_rows(
+            rows=rows_by_output[
+                _overall_output_key(
+                    comparison
+                )
+            ],
+            output_file=overall_path,
+            include_class=False,
+        )
 
-        for row in rows:
-            writer.writerow({
-                "comparison": row.comparison,
-                "frequency_band": row.frequency_band,
-                "n": row.n,
-                "mean_a": _format_float(row.mean_a),
-                "std_a": _format_float(row.std_a),
-                "median_a": _format_float(row.median_a),
-                "mean_b": _format_float(row.mean_b),
-                "std_b": _format_float(row.std_b),
-                "median_b": _format_float(row.median_b),
-                "mean_difference": _format_float(
-                    row.mean_difference
-                ),
-                "median_difference": _format_float(
-                    row.median_difference
-                ),
-                "wilcoxon_statistic": _format_float(
-                    row.wilcoxon_statistic
-                ),
-                "p_value": _format_float(row.p_value),
-                "p_value_fdr": _format_float(
-                    row.p_value_fdr
-                ),
-                "significant_fdr": row.significant_fdr,
-                "direction": row.direction,
-            })
+        output_paths.append(
+            overall_path
+        )
 
-    return output_file
+        classwise_path = (
+            get_frequency_statistical_classwise_results_path(
+                comparison.slug
+            )
+        )
+
+        _save_frequency_statistics_rows(
+            rows=rows_by_output[
+                _classwise_output_key(
+                    comparison
+                )
+            ],
+            output_file=classwise_path,
+            include_class=True,
+        )
+
+        output_paths.append(
+            classwise_path
+        )
+
+    return output_paths
 
 
 def print_frequency_statistics(
-    rows: list[FrequencyStatisticRow],
+    rows_by_output: dict[str, list[FrequencyStatisticRow]],
 ) -> None:
     """
     Print a compact console summary grouped by comparison.
     """
-    rows_by_comparison = {
-        comparison.name: [
-            row
-            for row in rows
-            if row.comparison == comparison.name
-        ]
-        for comparison in COMPARISONS
-    }
-
     for comparison in COMPARISONS:
         print()
         print("=" * 70)
         print(comparison.name)
         print("=" * 70)
         print(
-            f"{'Band':<8} "
-            f"{comparison.left_label + ' mean+/-SD':<24} "
-            f"{comparison.right_label + ' mean+/-SD':<26} "
-            f"{'Delta':>8} "
-            f"{'p':>10} "
+            f"{'Scope':<12} "
+            f"{'Band':<10} "
+            f"{comparison.left_label + ' mean+/-SD':<28} "
+            f"{comparison.right_label + ' mean+/-SD':<28} "
+            f"{'A-B':>8} "
             f"{'p_FDR':>10}"
         )
 
-        for row in rows_by_comparison[
-            comparison.name
+        for row in rows_by_output[
+            _overall_output_key(
+                comparison
+            )
         ]:
-            marker = (
-                "*"
-                if row.significant_fdr
-                else ""
+            _print_frequency_row(
+                scope="Overall",
+                row=row,
             )
 
-            print(
-                f"{row.frequency_band:<8} "
-                f"{_mean_sd(row.mean_a, row.std_a):<24} "
-                f"{_mean_sd(row.mean_b, row.std_b):<26} "
-                f"{row.mean_difference:>8.4f} "
-                f"{row.p_value:>10.4g} "
-                f"{row.p_value_fdr:>10.4g}"
-                f"{marker}"
+        for row in rows_by_output[
+            _classwise_output_key(
+                comparison
             )
+        ]:
+            _print_frequency_row(
+                scope=row.class_name or "",
+                row=row,
+            )
+
+
+def _compute_overall_statistics(
+    profile_lookup: dict[
+        tuple[int, ModelName, TrialSelection],
+        SubjectFrequencyProfile,
+    ],
+    comparison: FrequencyComparison,
+) -> list[FrequencyStatisticRow]:
+    rows = []
+    raw_p_values = []
+
+    for band_index, (band_name, band_low, band_high) in enumerate(
+        STATISTICAL_FREQUENCY_BANDS
+    ):
+        left_values, right_values = _paired_overall_band_values(
+            profile_lookup=profile_lookup,
+            comparison=comparison,
+            band_index=band_index,
+        )
+
+        row = _compute_statistic_row(
+            comparison=comparison,
+            frequency_band=band_name,
+            band_low=band_low,
+            band_high=band_high,
+            left_values=left_values,
+            right_values=right_values,
+        )
+
+        rows.append(
+            row
+        )
+
+        raw_p_values.append(
+            row.p_value
+        )
+
+    return _with_fdr_correction(
+        rows,
+        raw_p_values,
+    )
+
+
+def _compute_classwise_statistics(
+    profile_lookup: dict[
+        tuple[int, ModelName, TrialSelection],
+        SubjectFrequencyProfile,
+    ],
+    comparison: FrequencyComparison,
+) -> list[FrequencyStatisticRow]:
+    corrected_rows = []
+
+    for class_index, class_name in enumerate(
+        CLASS_NAMES
+    ):
+        class_rows = []
+        raw_p_values = []
+
+        for band_index, (band_name, band_low, band_high) in enumerate(
+            STATISTICAL_FREQUENCY_BANDS
+        ):
+            left_values, right_values = _paired_class_band_values(
+                profile_lookup=profile_lookup,
+                comparison=comparison,
+                class_index=class_index,
+                band_index=band_index,
+            )
+
+            row = _compute_statistic_row(
+                comparison=comparison,
+                frequency_band=band_name,
+                band_low=band_low,
+                band_high=band_high,
+                left_values=left_values,
+                right_values=right_values,
+                class_name=class_name,
+            )
+
+            class_rows.append(
+                row
+            )
+
+            raw_p_values.append(
+                row.p_value
+            )
+
+        corrected_rows.extend(
+            _with_fdr_correction(
+                class_rows,
+                raw_p_values,
+            )
+        )
+
+    return corrected_rows
+
+
+def _compute_statistic_row(
+    comparison: FrequencyComparison,
+    frequency_band: str,
+    band_low: float,
+    band_high: float,
+    left_values: np.ndarray,
+    right_values: np.ndarray,
+    class_name: str | None = None,
+) -> FrequencyStatisticRow:
+    differences = (
+        left_values
+        - right_values
+    )
+
+    statistic, p_value = _paired_wilcoxon(
+        differences
+    )
+
+    mean_difference = _nanmean(
+        differences
+    )
+
+    return FrequencyStatisticRow(
+        comparison=comparison.name,
+        comparison_slug=comparison.slug,
+        class_name=class_name,
+        frequency_band=frequency_band,
+        band_low=band_low,
+        band_high=band_high,
+        n=len(differences),
+        mean_a=_nanmean(left_values),
+        std_a=_nanstd(left_values),
+        median_a=_nanmedian(left_values),
+        mean_b=_nanmean(right_values),
+        std_b=_nanstd(right_values),
+        median_b=_nanmedian(right_values),
+        mean_difference=mean_difference,
+        median_difference=_nanmedian(
+            differences
+        ),
+        wilcoxon_statistic=statistic,
+        p_value=p_value,
+        p_value_fdr=np.nan,
+        significant_fdr=False,
+        direction=_direction_label(
+            comparison=comparison,
+            mean_difference=mean_difference,
+        ),
+    )
 
 
 def _load_csp_subject_profiles(
@@ -514,6 +513,7 @@ def _load_csp_subject_profiles(
         band_relevance = _aggregate_frequency_bins_to_bands(
             values=class_relevance,
             frequencies=result.frequencies,
+            frequency_bands=_statistical_band_ranges(),
         )
 
         profiles.append(
@@ -521,7 +521,7 @@ def _load_csp_subject_profiles(
                 subject=subject,
                 model="csp",
                 condition=condition,
-                values=_class_balanced_relative_profile(
+                class_values=_relative_class_profiles(
                     band_relevance
                 ),
             )
@@ -550,10 +550,10 @@ def _load_eegnet_subject_profiles(
         shap_file
     )
 
-    if result.frequency_bands != FREQUENCY_BANDS:
+    if result.frequency_bands != EEGNET_SOURCE_FREQUENCY_BANDS:
         raise ValueError(
             "Saved SHAP frequency bands do not match "
-            "the configured frequency bands."
+            "the configured EEGNet source frequency bands."
         )
 
     profiles = []
@@ -568,8 +568,15 @@ def _load_eegnet_subject_profiles(
             trial_mask=mask,
         )
 
-        class_relevance = _mapping_to_class_matrix(
-            frequency_relevance
+        source_class_relevance = _mapping_to_class_matrix(
+            frequency_relevance,
+            n_bands=len(EEGNET_SOURCE_FREQUENCY_BANDS),
+        )
+
+        band_relevance = _aggregate_source_bands_to_bands(
+            values=source_class_relevance,
+            source_bands=EEGNET_SOURCE_FREQUENCY_BANDS,
+            target_bands=_statistical_band_ranges(),
         )
 
         profiles.append(
@@ -577,8 +584,8 @@ def _load_eegnet_subject_profiles(
                 subject=subject,
                 model="eegnet",
                 condition=condition,
-                values=_class_balanced_relative_profile(
-                    class_relevance
+                class_values=_relative_class_profiles(
+                    band_relevance
                 ),
             )
         )
@@ -651,9 +658,10 @@ def _get_fold_numbers(
 def _aggregate_frequency_bins_to_bands(
     values: np.ndarray,
     frequencies: np.ndarray,
+    frequency_bands: tuple[tuple[float, float], ...],
 ) -> np.ndarray:
     """
-    Aggregate dense CSP FFT bins into the configured two-Hz bands.
+    Aggregate dense CSP FFT bins into statistical bands.
     """
     values = np.asarray(
         values,
@@ -668,16 +676,16 @@ def _aggregate_frequency_bins_to_bands(
     band_values = np.full(
         (
             values.shape[0],
-            len(FREQUENCY_BANDS),
+            len(frequency_bands),
         ),
         np.nan,
         dtype=np.float64,
     )
 
     for band_index, (low, high) in enumerate(
-        FREQUENCY_BANDS
+        frequency_bands
     ):
-        if band_index == len(FREQUENCY_BANDS) - 1:
+        if band_index == len(frequency_bands) - 1:
             frequency_mask = (
                 (frequencies >= low)
                 & (frequencies <= high)
@@ -707,16 +715,77 @@ def _aggregate_frequency_bins_to_bands(
     return band_values
 
 
+def _aggregate_source_bands_to_bands(
+    values: np.ndarray,
+    source_bands: tuple[tuple[float, float], ...],
+    target_bands: tuple[tuple[float, float], ...],
+) -> np.ndarray:
+    """
+    Aggregate saved EEGNet 2-Hz SHAP bands into statistical bands.
+    """
+    values = np.asarray(
+        values,
+        dtype=np.float64,
+    )
+
+    band_values = np.full(
+        (
+            values.shape[0],
+            len(target_bands),
+        ),
+        np.nan,
+        dtype=np.float64,
+    )
+
+    for target_index, (target_low, target_high) in enumerate(
+        target_bands
+    ):
+        weighted_values = np.zeros(
+            values.shape[0],
+            dtype=np.float64,
+        )
+
+        has_overlap = False
+
+        for source_index, (source_low, source_high) in enumerate(
+            source_bands
+        ):
+            overlap = max(
+                0.0,
+                min(target_high, source_high)
+                - max(target_low, source_low),
+            )
+
+            if overlap <= 0:
+                continue
+
+            has_overlap = True
+            source_width = source_high - source_low
+
+            weighted_values += (
+                values[
+                    :,
+                    source_index,
+                ]
+                * (overlap / source_width)
+            )
+
+        if has_overlap:
+            band_values[
+                :,
+                target_index,
+            ] = weighted_values
+
+    return band_values
+
+
 def _mapping_to_class_matrix(
     relevance: dict[int, np.ndarray],
+    n_bands: int,
 ) -> np.ndarray:
     """
     Convert class-id keyed relevance to a class x band matrix.
     """
-    n_bands = len(
-        FREQUENCY_BANDS
-    )
-
     matrix = np.full(
         (
             len(CLASS_LABELS),
@@ -742,7 +811,7 @@ def _mapping_to_class_matrix(
         ):
             raise ValueError(
                 "Frequency relevance must contain one "
-                "value per configured frequency band."
+                "value per source frequency band."
             )
 
         matrix[
@@ -752,11 +821,11 @@ def _mapping_to_class_matrix(
     return matrix
 
 
-def _class_balanced_relative_profile(
+def _relative_class_profiles(
     class_relevance: np.ndarray,
 ) -> np.ndarray:
     """
-    Normalize each class profile to sum to one, then average classes.
+    Normalize each class profile to sum to one.
     """
     class_relevance = np.asarray(
         class_relevance,
@@ -792,34 +861,48 @@ def _class_balanced_relative_profile(
             class_index
         ] = values / denominator
 
-    if np.all(
-        np.isnan(
-            normalized
+    return normalized
+
+
+def _class_balanced_relative_profile(
+    class_values: np.ndarray,
+) -> np.ndarray:
+    """
+    Average the four class-normalized profiles with equal class weight.
+    """
+    if (
+        class_values.shape[0]
+        != len(CLASS_LABELS)
+    ):
+        raise ValueError(
+            "Class-balanced profiles require all motor imagery classes."
+        )
+
+    if np.any(
+        ~np.isfinite(
+            class_values
         )
     ):
         return np.full(
-            class_relevance.shape[1],
+            class_values.shape[1],
             np.nan,
             dtype=np.float64,
         )
 
-    return np.nanmean(
-        normalized,
+    return np.mean(
+        class_values,
         axis=0,
     )
 
 
-def _paired_band_values(
+def _paired_overall_band_values(
     profile_lookup: dict[
         tuple[int, ModelName, TrialSelection],
-        np.ndarray,
+        SubjectFrequencyProfile,
     ],
     comparison: FrequencyComparison,
     band_index: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Return paired left/right values for one comparison and band.
-    """
     left_values = []
     right_values = []
 
@@ -840,12 +923,77 @@ def _paired_band_values(
         ):
             continue
 
-        left_value = left_profile[
+        left_value = left_profile.values[
             band_index
         ]
 
-        right_value = right_profile[
+        right_value = right_profile.values[
             band_index
+        ]
+
+        if not (
+            np.isfinite(left_value)
+            and np.isfinite(right_value)
+        ):
+            continue
+
+        left_values.append(
+            left_value
+        )
+
+        right_values.append(
+            right_value
+        )
+
+    return (
+        np.asarray(
+            left_values,
+            dtype=np.float64,
+        ),
+        np.asarray(
+            right_values,
+            dtype=np.float64,
+        ),
+    )
+
+
+def _paired_class_band_values(
+    profile_lookup: dict[
+        tuple[int, ModelName, TrialSelection],
+        SubjectFrequencyProfile,
+    ],
+    comparison: FrequencyComparison,
+    class_index: int,
+    band_index: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    left_values = []
+    right_values = []
+
+    for subject in SUBJECTS:
+        left_profile = profile_lookup.get((
+            subject,
+            *comparison.left_key,
+        ))
+
+        right_profile = profile_lookup.get((
+            subject,
+            *comparison.right_key,
+        ))
+
+        if (
+            left_profile is None
+            or right_profile is None
+        ):
+            continue
+
+        left_value = left_profile.class_values[
+            class_index,
+            band_index,
+        ]
+
+        right_value = right_profile.class_values[
+            class_index,
+            band_index,
         ]
 
         if not (
@@ -878,7 +1026,7 @@ def _paired_wilcoxon(
     differences: np.ndarray,
 ) -> tuple[float, float]:
     """
-    Compute a paired Wilcoxon signed-rank test from paired differences.
+    Compute a two-sided paired Wilcoxon signed-rank test.
     """
     differences = np.asarray(
         differences,
@@ -901,13 +1049,54 @@ def _paired_wilcoxon(
         return 0.0, 1.0
 
     statistic, p_value = wilcoxon(
-        differences
+        differences,
+        alternative="two-sided",
     )
 
     return (
         float(statistic),
         float(p_value),
     )
+
+
+def _with_fdr_correction(
+    rows: list[FrequencyStatisticRow],
+    p_values: list[float],
+) -> list[FrequencyStatisticRow]:
+    corrected_p_values, significant = _fdr_correct(
+        p_values
+    )
+
+    return [
+        FrequencyStatisticRow(
+            comparison=row.comparison,
+            comparison_slug=row.comparison_slug,
+            class_name=row.class_name,
+            frequency_band=row.frequency_band,
+            band_low=row.band_low,
+            band_high=row.band_high,
+            n=row.n,
+            mean_a=row.mean_a,
+            std_a=row.std_a,
+            median_a=row.median_a,
+            mean_b=row.mean_b,
+            std_b=row.std_b,
+            median_b=row.median_b,
+            mean_difference=row.mean_difference,
+            median_difference=row.median_difference,
+            wilcoxon_statistic=row.wilcoxon_statistic,
+            p_value=row.p_value,
+            p_value_fdr=p_value_fdr,
+            significant_fdr=bool(is_significant),
+            direction=row.direction,
+        )
+        for row, p_value_fdr, is_significant in zip(
+            rows,
+            corrected_p_values,
+            significant,
+            strict=True,
+        )
+    ]
 
 
 def _fdr_correct(
@@ -957,12 +1146,109 @@ def _fdr_correct(
     return corrected, significant
 
 
+def _save_frequency_statistics_rows(
+    rows: list[FrequencyStatisticRow],
+    output_file: str | Path,
+    include_class: bool,
+) -> Path:
+    output_file = Path(
+        output_file
+    )
+
+    output_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    fieldnames = [
+        "comparison",
+    ]
+
+    if include_class:
+        fieldnames.append(
+            "class"
+        )
+
+    fieldnames.extend([
+        "frequency_band",
+        "band_low",
+        "band_high",
+        "n",
+        "mean_a",
+        "std_a",
+        "median_a",
+        "mean_b",
+        "std_b",
+        "median_b",
+        "mean_difference",
+        "median_difference",
+        "wilcoxon_statistic",
+        "p_value",
+        "p_value_fdr",
+        "significant_fdr",
+        "direction",
+    ])
+
+    with output_file.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fieldnames,
+        )
+
+        writer.writeheader()
+
+        for row in rows:
+            output_row = {
+                "comparison": row.comparison,
+                "frequency_band": row.frequency_band,
+                "band_low": _format_float(row.band_low),
+                "band_high": _format_float(row.band_high),
+                "n": row.n,
+                "mean_a": _format_float(row.mean_a),
+                "std_a": _format_float(row.std_a),
+                "median_a": _format_float(row.median_a),
+                "mean_b": _format_float(row.mean_b),
+                "std_b": _format_float(row.std_b),
+                "median_b": _format_float(row.median_b),
+                "mean_difference": _format_float(
+                    row.mean_difference
+                ),
+                "median_difference": _format_float(
+                    row.median_difference
+                ),
+                "wilcoxon_statistic": _format_float(
+                    row.wilcoxon_statistic
+                ),
+                "p_value": _format_float(row.p_value),
+                "p_value_fdr": _format_float(
+                    row.p_value_fdr
+                ),
+                "significant_fdr": row.significant_fdr,
+                "direction": row.direction,
+            }
+
+            if include_class:
+                output_row[
+                    "class"
+                ] = row.class_name
+
+            writer.writerow(
+                output_row
+            )
+
+    return output_file
+
+
 def _direction_label(
     comparison: FrequencyComparison,
     mean_difference: float,
 ) -> str:
     """
-    Build a readable direction from the paired mean difference sign.
+    Build a readable direction from the A-B paired mean difference sign.
     """
     if not np.isfinite(
         mean_difference
@@ -978,17 +1264,32 @@ def _direction_label(
     )
 
     return (
-        f"{comparison.right_label} "
+        f"{comparison.left_label} "
         f"{operator} "
-        f"{comparison.left_label}"
+        f"{comparison.right_label}"
     )
 
 
-def _format_band(
-    low: float,
-    high: float,
+def _statistical_band_ranges() -> tuple[tuple[float, float], ...]:
+    return tuple(
+        (
+            low,
+            high,
+        )
+        for _, low, high in STATISTICAL_FREQUENCY_BANDS
+    )
+
+
+def _overall_output_key(
+    comparison: FrequencyComparison,
 ) -> str:
-    return f"{low:g}-{high:g}"
+    return f"{comparison.slug}:overall"
+
+
+def _classwise_output_key(
+    comparison: FrequencyComparison,
+) -> str:
+    return f"{comparison.slug}:classwise"
 
 
 def _nanmean(
@@ -1037,6 +1338,27 @@ def _mean_sd(
 ) -> str:
     return (
         f"{mean:.4f}+/-{std:.4f}"
+    )
+
+
+def _print_frequency_row(
+    scope: str,
+    row: FrequencyStatisticRow,
+) -> None:
+    marker = (
+        "*"
+        if row.significant_fdr
+        else ""
+    )
+
+    print(
+        f"{scope:<12} "
+        f"{row.frequency_band:<10} "
+        f"{_mean_sd(row.mean_a, row.std_a):<28} "
+        f"{_mean_sd(row.mean_b, row.std_b):<28} "
+        f"{row.mean_difference:>8.4f} "
+        f"{row.p_value_fdr:>10.4g}"
+        f"{marker}"
     )
 
 

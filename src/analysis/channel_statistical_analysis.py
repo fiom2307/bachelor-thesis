@@ -107,6 +107,20 @@ class SubjectChannelProfile:
 
 
 @dataclass(frozen=True)
+class SubjectNormalizedChannelProfile:
+    subject: int
+    model: ModelName
+    condition: TrialSelection
+    class_values: np.ndarray
+
+    @property
+    def values(self) -> np.ndarray:
+        return _class_balanced_channel_profile(
+            self.class_values
+        )
+
+
+@dataclass(frozen=True)
 class ChannelComparison:
     name: str
     slug: str
@@ -200,17 +214,29 @@ def collect_subject_channel_profiles() -> list[
     """
     Build class-wise ROI profiles per subject/model/condition.
     """
+    return build_subject_roi_profiles(
+        collect_subject_normalized_channel_profiles(),
+        SPATIAL_ROIS,
+    )
+
+
+def collect_subject_normalized_channel_profiles() -> list[
+    SubjectNormalizedChannelProfile
+]:
+    """
+    Build class-wise normalized channel profiles per subject/model/condition.
+    """
     profiles = []
 
     for subject in SUBJECTS:
         profiles.extend(
-            _load_csp_subject_profiles(
+            _load_csp_normalized_subject_profiles(
                 subject
             )
         )
 
         profiles.extend(
-            _load_eegnet_subject_profiles(
+            _load_eegnet_normalized_subject_profiles(
                 subject
             )
         )
@@ -218,8 +244,33 @@ def collect_subject_channel_profiles() -> list[
     return profiles
 
 
+def build_subject_roi_profiles(
+    profiles: list[SubjectNormalizedChannelProfile],
+    spatial_rois: tuple[tuple[str, tuple[str, ...]], ...],
+) -> list[SubjectChannelProfile]:
+    """
+    Reduce normalized channel profiles to ROI profiles.
+    """
+    return [
+        SubjectChannelProfile(
+            subject=profile.subject,
+            model=profile.model,
+            condition=profile.condition,
+            class_values=_class_roi_profiles(
+                profile.class_values,
+                spatial_rois,
+            ),
+        )
+        for profile in profiles
+    ]
+
+
 def compute_channel_statistics(
     profiles: list[SubjectChannelProfile],
+    spatial_rois: tuple[
+        tuple[str, tuple[str, ...]],
+        ...,
+    ] = SPATIAL_ROIS,
 ) -> dict[str, list[ChannelStatisticRow]]:
     """
     Compute overall and class-wise Wilcoxon tests for each ROI comparison.
@@ -243,6 +294,7 @@ def compute_channel_statistics(
         ] = _compute_overall_statistics(
             profile_lookup=profile_lookup,
             comparison=comparison,
+            spatial_rois=spatial_rois,
         )
 
         rows_by_output[
@@ -252,6 +304,7 @@ def compute_channel_statistics(
         ] = _compute_classwise_statistics(
             profile_lookup=profile_lookup,
             comparison=comparison,
+            spatial_rois=spatial_rois,
         )
 
     return rows_by_output
@@ -351,12 +404,13 @@ def _compute_overall_statistics(
         SubjectChannelProfile,
     ],
     comparison: ChannelComparison,
+    spatial_rois: tuple[tuple[str, tuple[str, ...]], ...],
 ) -> list[ChannelStatisticRow]:
     rows = []
     raw_p_values = []
 
     for roi_index, (roi_name, channels) in enumerate(
-        SPATIAL_ROIS
+        spatial_rois
     ):
         left_values, right_values = _paired_overall_roi_values(
             profile_lookup=profile_lookup,
@@ -394,6 +448,7 @@ def _compute_classwise_statistics(
         SubjectChannelProfile,
     ],
     comparison: ChannelComparison,
+    spatial_rois: tuple[tuple[str, tuple[str, ...]], ...],
 ) -> list[ChannelStatisticRow]:
     corrected_rows = []
 
@@ -404,7 +459,7 @@ def _compute_classwise_statistics(
         raw_p_values = []
 
         for roi_index, (roi_name, channels) in enumerate(
-            SPATIAL_ROIS
+            spatial_rois
         ):
             left_values, right_values = _paired_class_roi_values(
                 profile_lookup=profile_lookup,
@@ -498,6 +553,20 @@ def _load_csp_subject_profiles(
     """
     Compute subject-level CSP+LDA profiles using existing relevance code.
     """
+    return build_subject_roi_profiles(
+        _load_csp_normalized_subject_profiles(
+            subject
+        ),
+        SPATIAL_ROIS,
+    )
+
+
+def _load_csp_normalized_subject_profiles(
+    subject: int,
+) -> list[SubjectNormalizedChannelProfile]:
+    """
+    Compute subject-level normalized CSP+LDA channel profiles.
+    """
     csps, ldas = _load_subject_models(
         subject
     )
@@ -533,14 +602,12 @@ def _load_csp_subject_profiles(
         )
 
         profiles.append(
-            SubjectChannelProfile(
+            SubjectNormalizedChannelProfile(
                 subject=subject,
                 model="csp",
                 condition=condition,
-                class_values=_class_roi_profiles(
-                    _relative_class_profiles(
-                        class_relevance
-                    )
+                class_values=_relative_class_profiles(
+                    class_relevance
                 ),
             )
         )
@@ -553,6 +620,20 @@ def _load_eegnet_subject_profiles(
 ) -> list[SubjectChannelProfile]:
     """
     Load saved time-domain SHAP values and summarize channel relevance.
+    """
+    return build_subject_roi_profiles(
+        _load_eegnet_normalized_subject_profiles(
+            subject
+        ),
+        SPATIAL_ROIS,
+    )
+
+
+def _load_eegnet_normalized_subject_profiles(
+    subject: int,
+) -> list[SubjectNormalizedChannelProfile]:
+    """
+    Load saved time-domain SHAP values and build normalized channel profiles.
     """
     shap_file = get_time_domain_shap_values_path(
         subject
@@ -585,15 +666,13 @@ def _load_eegnet_subject_profiles(
         )
 
         profiles.append(
-            SubjectChannelProfile(
+            SubjectNormalizedChannelProfile(
                 subject=subject,
                 model="eegnet",
                 condition=condition,
-                class_values=_class_roi_profiles(
-                    _relative_class_profiles(
-                        _mapping_to_class_matrix(
-                            channel_relevance
-                        )
+                class_values=_relative_class_profiles(
+                    _mapping_to_class_matrix(
+                        channel_relevance
                     )
                 ),
             )
@@ -784,6 +863,10 @@ def _relative_class_profiles(
 
 def _class_roi_profiles(
     class_values: np.ndarray,
+    spatial_rois: tuple[
+        tuple[str, tuple[str, ...]],
+        ...,
+    ] = SPATIAL_ROIS,
 ) -> np.ndarray:
     """
     Average normalized channel relevance within each ROI.
@@ -791,14 +874,14 @@ def _class_roi_profiles(
     roi_values = np.full(
         (
             len(CLASS_LABELS),
-            len(SPATIAL_ROIS),
+            len(spatial_rois),
         ),
         np.nan,
         dtype=np.float64,
     )
 
     for roi_index, (_, channels) in enumerate(
-        SPATIAL_ROIS
+        spatial_rois
     ):
         channel_indices = _roi_channel_indices(
             channels
@@ -838,6 +921,37 @@ def _class_balanced_roi_profile(
 ) -> np.ndarray:
     """
     Average the four class-normalized ROI profiles with equal class weight.
+    """
+    if (
+        class_values.shape[0]
+        != len(CLASS_LABELS)
+    ):
+        raise ValueError(
+            "Class-balanced profiles require all motor imagery classes."
+        )
+
+    if np.any(
+        ~np.isfinite(
+            class_values
+        )
+    ):
+        return np.full(
+            class_values.shape[1],
+            np.nan,
+            dtype=np.float64,
+        )
+
+    return np.mean(
+        class_values,
+        axis=0,
+    )
+
+
+def _class_balanced_channel_profile(
+    class_values: np.ndarray,
+) -> np.ndarray:
+    """
+    Average the four class-normalized channel profiles with equal class weight.
     """
     if (
         class_values.shape[0]

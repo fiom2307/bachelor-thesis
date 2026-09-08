@@ -26,6 +26,8 @@ CSP_PATTERN_ANALYSIS_DIR = RESULTS_DIR / "csp_pattern_analysis"
 STATISTICAL_ANALYSIS_DIR = RESULTS_DIR / "statistical_analysis"
 
 CSP_LDA_EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "csp_lda_experiments"
+EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "experiments"
+EXPERIMENT_MODEL_DIR = MODEL_DIR / "experiments"
 
 
 TrialSelection = Literal[
@@ -69,6 +71,8 @@ for directory in (
     CSP_PATTERN_ANALYSIS_DIR,
     STATISTICAL_ANALYSIS_DIR,
     CSP_LDA_EXPERIMENT_RESULTS_DIR,
+    EXPERIMENT_RESULTS_DIR,
+    EXPERIMENT_MODEL_DIR,
 ):
     directory.mkdir(
         parents=True,
@@ -1001,6 +1005,26 @@ def get_channel_statistical_analysis_dir() -> Path:
     )
 
 
+def get_channel_sensorimotor_statistical_analysis_dir() -> Path:
+    """
+    Return the sensorimotor channel statistical analysis directory.
+    """
+    return _create_directory(
+        STATISTICAL_ANALYSIS_DIR
+        / "channel_sensorimotor"
+    )
+
+
+def get_channel_entropy_statistical_analysis_dir() -> Path:
+    """
+    Return the channel entropy statistical analysis directory.
+    """
+    return _create_directory(
+        STATISTICAL_ANALYSIS_DIR
+        / "channel_entropy"
+    )
+
+
 def get_channel_statistical_comparison_dir(
     comparison_slug: str,
 ) -> Path:
@@ -1013,6 +1037,30 @@ def get_channel_statistical_comparison_dir(
     )
 
 
+def get_channel_sensorimotor_statistical_comparison_dir(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one sensorimotor channel statistical comparison directory.
+    """
+    return _create_directory(
+        get_channel_sensorimotor_statistical_analysis_dir()
+        / comparison_slug
+    )
+
+
+def get_channel_entropy_statistical_comparison_dir(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one channel entropy statistical comparison directory.
+    """
+    return _create_directory(
+        get_channel_entropy_statistical_analysis_dir()
+        / comparison_slug
+    )
+
+
 def get_channel_statistical_overall_results_path(
     comparison_slug: str,
 ) -> Path:
@@ -1021,6 +1069,34 @@ def get_channel_statistical_overall_results_path(
     """
     return (
         get_channel_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall_statistics.csv"
+    )
+
+
+def get_channel_sensorimotor_statistical_overall_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall sensorimotor channel statistical CSV path.
+    """
+    return (
+        get_channel_sensorimotor_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall_statistics.csv"
+    )
+
+
+def get_channel_entropy_statistical_overall_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall channel entropy statistical CSV path.
+    """
+    return (
+        get_channel_entropy_statistical_comparison_dir(
             comparison_slug
         )
         / "overall_statistics.csv"
@@ -1041,6 +1117,34 @@ def get_channel_statistical_classwise_results_path(
     )
 
 
+def get_channel_sensorimotor_statistical_classwise_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise sensorimotor channel statistical CSV path.
+    """
+    return (
+        get_channel_sensorimotor_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise_statistics.csv"
+    )
+
+
+def get_channel_entropy_statistical_classwise_results_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise channel entropy statistical CSV path.
+    """
+    return (
+        get_channel_entropy_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise_statistics.csv"
+    )
+
+
 def get_channel_statistical_overall_plot_path(
     comparison_slug: str,
 ) -> Path:
@@ -1055,6 +1159,34 @@ def get_channel_statistical_overall_plot_path(
     )
 
 
+def get_channel_sensorimotor_statistical_overall_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall sensorimotor channel statistical plot path.
+    """
+    return (
+        get_channel_sensorimotor_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall.png"
+    )
+
+
+def get_channel_entropy_statistical_overall_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one overall channel entropy statistical plot path.
+    """
+    return (
+        get_channel_entropy_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "overall.png"
+    )
+
+
 def get_channel_statistical_classwise_plot_path(
     comparison_slug: str,
 ) -> Path:
@@ -1063,6 +1195,34 @@ def get_channel_statistical_classwise_plot_path(
     """
     return (
         get_channel_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise.png"
+    )
+
+
+def get_channel_sensorimotor_statistical_classwise_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise sensorimotor channel statistical plot path.
+    """
+    return (
+        get_channel_sensorimotor_statistical_comparison_dir(
+            comparison_slug
+        )
+        / "classwise.png"
+    )
+
+
+def get_channel_entropy_statistical_classwise_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one class-wise channel entropy statistical plot path.
+    """
+    return (
+        get_channel_entropy_statistical_comparison_dir(
             comparison_slug
         )
         / "classwise.png"
@@ -1146,4 +1306,28 @@ def get_csp_lda_n_components_accuracy_plot_path() -> Path:
     return (
         CSP_LDA_EXPERIMENT_RESULTS_DIR
         / "n_components_accuracy_comparison.png"
+    )
+
+
+def get_experiment_results_dir(
+    experiment_name: str,
+) -> Path:
+    """
+    Return the results directory for a standalone experiment.
+    """
+    return _create_directory(
+        EXPERIMENT_RESULTS_DIR
+        / experiment_name
+    )
+
+
+def get_experiment_model_dir(
+    experiment_name: str,
+) -> Path:
+    """
+    Return the model-cache directory for a standalone experiment.
+    """
+    return _create_directory(
+        EXPERIMENT_MODEL_DIR
+        / experiment_name
     )

@@ -12,6 +12,7 @@ MODEL_DIR = ROOT_DIR / "models"
 RESULTS_DIR = ROOT_DIR / "results"
 
 EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
+EEGNET_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "eegnet_time_window"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 CSP_LDA_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "csp_lda_time_window"
 CSP_LDA_N_COMPONENTS_MODEL_DIR = MODEL_DIR / "csp_lda_n_components"
@@ -60,6 +61,7 @@ CSPPatternPlotType = Literal[
 # Create main output directories
 for directory in (
     EEGNET_MODEL_DIR,
+    EEGNET_TIME_WINDOW_MODEL_DIR,
     CSP_LDA_MODEL_DIR,
     CSP_LDA_TIME_WINDOW_MODEL_DIR,
     CSP_LDA_N_COMPONENTS_MODEL_DIR,
@@ -504,6 +506,23 @@ def get_eegnet_subject_dir(
     )
 
 
+def get_eegnet_time_window_subject_dir(
+    subject: int,
+    tmin: float,
+    tmax: float,
+) -> Path:
+    """
+    Return and create the EEGNet time-window model directory for one subject.
+    """
+    window_name = f"{tmin:.1f}_{tmax:.1f}"
+
+    return _create_directory(
+        EEGNET_TIME_WINDOW_MODEL_DIR
+        / window_name
+        / get_subject_name(subject)
+    )
+
+
 def get_eegnet_fold_model_path(
     subject: int,
     fold: int,
@@ -522,6 +541,33 @@ def get_eegnet_fold_model_path(
 
     return (
         get_eegnet_subject_dir(subject)
+        / filename
+    )
+
+
+def get_eegnet_time_window_fold_model_path(
+    subject: int,
+    fold: int,
+    tmin: float,
+    tmax: float,
+) -> Path:
+    """
+    Return the EEGNet model path for one fold and temporal window.
+    """
+    subject_name = get_subject_name(
+        subject
+    )
+
+    filename = (
+        f"{subject_name}_eegnet_fold{fold}.keras"
+    )
+
+    return (
+        get_eegnet_time_window_subject_dir(
+            subject,
+            tmin,
+            tmax,
+        )
         / filename
     )
 
@@ -552,6 +598,19 @@ def get_results_accuracy_comparison_path_with_svm() -> Path:
         / (
             f"seed_{BASE_SEED}_"
             "csp_svm_vs_eegnet.csv"
+        )
+    )
+
+
+def get_eegnet_time_window_accuracy_results_path() -> Path:
+    """
+    Return the EEGNet time-window accuracy CSV path.
+    """
+    return (
+        ACCURACY_RESULTS_DIR
+        / (
+            f"seed_{BASE_SEED}_"
+            "eegnet_time_windows.csv"
         )
     )
 

@@ -25,6 +25,7 @@ from src.utils.cross_validation import (
 )
 from src.utils.paths import (
     get_eegnet_fold_model_path,
+    get_eegnet_time_window_fold_model_path,
     get_subject_name,
 )
 
@@ -126,6 +127,92 @@ def train_or_load_eegnet(
         print(
             f"Training {get_subject_name(subject)} "
             f"EEGNet fold {fold}/{N_FOLDS}"
+        )
+
+        set_seed(seed + fold)
+
+        X_tr = X_train[train_idx]
+        X_val = X_train[val_idx]
+        y_tr = y_train[train_idx]
+        y_val = y_train[val_idx]
+
+        y_tr_cat = tf.keras.utils.to_categorical(
+            y_tr,
+            num_classes=N_CLASSES,
+        )
+        y_val_cat = tf.keras.utils.to_categorical(
+            y_val,
+            num_classes=N_CLASSES,
+        )
+
+        model = create_eegnet_model(
+            n_channels,
+            n_samples,
+        )
+
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=EEGNET_EARLY_STOPPING_PATIENCE,
+            restore_best_weights=True,
+        )
+
+        model.fit(
+            X_tr,
+            y_tr_cat,
+            epochs=EEGNET_MAX_EPOCHS,
+            batch_size=EEGNET_BATCH_SIZE,
+            validation_data=(X_val, y_val_cat),
+            callbacks=[early_stopping],
+            verbose=0,
+        )
+
+        model.save(model_path)
+        models.append(model)
+
+    return models
+
+
+def train_or_load_eegnet_time_window(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    tmin: float,
+    tmax: float,
+) -> list[tf.keras.Model]:
+    """
+    Train or load one EEGNet model for each fold and temporal window.
+
+    This keeps the full-window EEGNet training procedure unchanged and
+    stores the cropped-window models in a separate directory.
+    """
+    seed = BASE_SEED + subject
+
+    n_channels = X_train.shape[1]
+    n_samples = X_train.shape[2]
+
+    models = []
+
+    for fold, train_idx, val_idx in get_stratified_folds(
+        X_train,
+        y_train,
+        seed,
+    ):
+        model_path = get_eegnet_time_window_fold_model_path(
+            subject,
+            fold,
+            tmin,
+            tmax,
+        )
+
+        if model_path.exists():
+            model = tf.keras.models.load_model(model_path)
+            models.append(model)
+            continue
+
+        print(
+            f"Training {get_subject_name(subject)} "
+            f"EEGNet fold {fold}/{N_FOLDS} "
+            f"for {tmin:.1f}-{tmax:.1f} s"
         )
 
         set_seed(seed + fold)

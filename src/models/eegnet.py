@@ -24,7 +24,9 @@ from src.utils.cross_validation import (
     get_stratified_folds,
 )
 from src.utils.paths import (
+    get_eegnet_channel_ablation_fold_model_path,
     get_eegnet_fold_model_path,
+    get_eegnet_roi_ablation_fold_model_path,
     get_eegnet_time_window_fold_model_path,
     get_subject_name,
 )
@@ -256,6 +258,152 @@ def train_or_load_eegnet_time_window(
         models.append(model)
 
     return models
+
+
+def train_or_load_eegnet_channel_ablation(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    condition: str,
+) -> list[tf.keras.Model]:
+    return _train_or_load_eegnet_ablation(
+        subject=subject,
+        X_train=X_train,
+        y_train=y_train,
+        condition=condition,
+        get_model_path=get_eegnet_channel_ablation_fold_model_path,
+    )
+
+
+def train_or_load_eegnet_roi_ablation(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    condition: str,
+) -> list[tf.keras.Model]:
+    return _train_or_load_eegnet_ablation(
+        subject=subject,
+        X_train=X_train,
+        y_train=y_train,
+        condition=condition,
+        get_model_path=get_eegnet_roi_ablation_fold_model_path,
+    )
+
+
+def _train_or_load_eegnet_ablation(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    condition: str,
+    get_model_path,
+) -> list[tf.keras.Model]:
+    seed = BASE_SEED + subject
+
+    n_channels = X_train.shape[1]
+    n_samples = X_train.shape[2]
+
+    models = []
+
+    for fold, train_idx, val_idx in get_stratified_folds(
+        X_train,
+        y_train,
+        seed,
+    ):
+        model_path = get_model_path(
+            subject,
+            fold,
+            condition,
+        )
+
+        if model_path.exists():
+            print(
+                f"[LOAD] {get_subject_name(subject)} "
+                f"EEGNet fold {fold}/{N_FOLDS} {condition}"
+            )
+            model = tf.keras.models.load_model(model_path)
+            _validate_eegnet_input_shape(
+                model,
+                n_channels,
+                n_samples,
+                model_path,
+            )
+            models.append(model)
+            continue
+
+        print(
+            f"[TRAIN] {get_subject_name(subject)} "
+            f"EEGNet fold {fold}/{N_FOLDS} {condition}"
+        )
+
+        set_seed(seed + fold)
+
+        X_tr = X_train[train_idx]
+        X_val = X_train[val_idx]
+        y_tr = y_train[train_idx]
+        y_val = y_train[val_idx]
+
+        y_tr_cat = tf.keras.utils.to_categorical(
+            y_tr,
+            num_classes=N_CLASSES,
+        )
+        y_val_cat = tf.keras.utils.to_categorical(
+            y_val,
+            num_classes=N_CLASSES,
+        )
+
+        model = create_eegnet_model(
+            n_channels,
+            n_samples,
+        )
+
+        early_stopping = tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=EEGNET_EARLY_STOPPING_PATIENCE,
+            restore_best_weights=True,
+        )
+
+        model.fit(
+            X_tr,
+            y_tr_cat,
+            epochs=EEGNET_MAX_EPOCHS,
+            batch_size=EEGNET_BATCH_SIZE,
+            validation_data=(X_val, y_val_cat),
+            callbacks=[early_stopping],
+            verbose=0,
+        )
+
+        model.save(model_path)
+        models.append(model)
+
+    return models
+
+
+def _validate_eegnet_input_shape(
+    model: tf.keras.Model,
+    n_channels: int,
+    n_samples: int,
+    model_path,
+) -> None:
+    input_shape = model.input_shape
+
+    if isinstance(input_shape, list):
+        input_shape = input_shape[0]
+
+    expected_shape = (
+        n_channels,
+        n_samples,
+        1,
+    )
+    actual_shape = tuple(
+        input_shape[1:]
+    )
+
+    if actual_shape != expected_shape:
+        raise ValueError(
+            f"Saved EEGNet model has incompatible input shape: "
+            f"{model_path}. Expected {expected_shape}, "
+            f"found {actual_shape}."
+        )
 
 
 def predict_eegnet(

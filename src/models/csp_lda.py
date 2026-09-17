@@ -18,6 +18,10 @@ from src.utils.paths import (
     get_lda_time_window_fold_model_path,
     get_csp_n_components_fold_model_path,
     get_lda_n_components_fold_model_path,
+    get_csp_channel_ablation_fold_model_path,
+    get_csp_roi_ablation_fold_model_path,
+    get_lda_channel_ablation_fold_model_path,
+    get_lda_roi_ablation_fold_model_path,
 )
 from src.utils.config import (
     CSP_N_COMPONENTS,
@@ -138,6 +142,50 @@ def save_csp_lda_n_components_fold_models(
     )
 
 
+def save_csp_lda_channel_ablation_fold_models(
+    subject: int,
+    fold: int,
+    condition: str,
+    csp: CSP,
+    lda: LinearDiscriminantAnalysis,
+) -> None:
+    csp_path = get_csp_channel_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+    lda_path = get_lda_channel_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+
+    joblib.dump(csp, csp_path)
+    joblib.dump(lda, lda_path)
+
+
+def save_csp_lda_roi_ablation_fold_models(
+    subject: int,
+    fold: int,
+    condition: str,
+    csp: CSP,
+    lda: LinearDiscriminantAnalysis,
+) -> None:
+    csp_path = get_csp_roi_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+    lda_path = get_lda_roi_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+
+    joblib.dump(csp, csp_path)
+    joblib.dump(lda, lda_path)
+
+
 def load_csp_lda_fold_models(
     subject: int,
     fold: int,
@@ -157,6 +205,50 @@ def load_csp_lda_fold_models(
     lda = joblib.load(lda_path)
 
     return csp, lda
+
+
+def load_csp_lda_channel_ablation_fold_models(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> tuple[CSP, LinearDiscriminantAnalysis] | None:
+    csp_path = get_csp_channel_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+    lda_path = get_lda_channel_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+
+    if not (csp_path.exists() and lda_path.exists()):
+        return None
+
+    return joblib.load(csp_path), joblib.load(lda_path)
+
+
+def load_csp_lda_roi_ablation_fold_models(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> tuple[CSP, LinearDiscriminantAnalysis] | None:
+    csp_path = get_csp_roi_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+    lda_path = get_lda_roi_ablation_fold_model_path(
+        subject,
+        fold,
+        condition,
+    )
+
+    if not (csp_path.exists() and lda_path.exists()):
+        return None
+
+    return joblib.load(csp_path), joblib.load(lda_path)
 
 
 def load_csp_lda_time_window_fold_models(
@@ -287,6 +379,38 @@ def train_or_load_csp_lda(
     return models
 
 
+def train_or_load_csp_lda_channel_ablation(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    condition: str,
+) -> list[tuple[CSP, LinearDiscriminantAnalysis]]:
+    return _train_or_load_csp_lda_ablation(
+        subject=subject,
+        X_train=X_train,
+        y_train=y_train,
+        condition=condition,
+        load_fold_models=load_csp_lda_channel_ablation_fold_models,
+        save_fold_models=save_csp_lda_channel_ablation_fold_models,
+    )
+
+
+def train_or_load_csp_lda_roi_ablation(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    condition: str,
+) -> list[tuple[CSP, LinearDiscriminantAnalysis]]:
+    return _train_or_load_csp_lda_ablation(
+        subject=subject,
+        X_train=X_train,
+        y_train=y_train,
+        condition=condition,
+        load_fold_models=load_csp_lda_roi_ablation_fold_models,
+        save_fold_models=save_csp_lda_roi_ablation_fold_models,
+    )
+
+
 def train_or_load_csp_lda_n_components(
     subject: int,
     X_train: np.ndarray,
@@ -341,6 +465,87 @@ def train_or_load_csp_lda_n_components(
         models.append((csp, lda))
 
     return models
+
+
+def _train_or_load_csp_lda_ablation(
+    subject: int,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    condition: str,
+    load_fold_models,
+    save_fold_models,
+) -> list[tuple[CSP, LinearDiscriminantAnalysis]]:
+    seed = BASE_SEED + subject
+    models = []
+
+    for fold, train_idx, _ in get_stratified_folds(
+        X_train,
+        y_train,
+        seed,
+    ):
+        saved_models = load_fold_models(
+            subject,
+            fold,
+            condition,
+        )
+
+        if saved_models is not None:
+            _validate_csp_input_shape(
+                saved_models[0],
+                X_train.shape[1],
+                condition,
+            )
+            print(
+                f"[LOAD] {get_subject_name(subject)} "
+                f"CSP+LDA fold {fold}/{N_FOLDS} {condition}"
+            )
+            models.append(saved_models)
+            continue
+
+        print(
+            f"[TRAIN] {get_subject_name(subject)} "
+            f"CSP+LDA fold {fold}/{N_FOLDS} {condition}"
+        )
+
+        X_tr = X_train[train_idx]
+        y_tr = y_train[train_idx]
+
+        csp, lda = train_csp_lda(X_tr, y_tr)
+
+        save_fold_models(
+            subject,
+            fold,
+            condition,
+            csp,
+            lda,
+        )
+
+        models.append((csp, lda))
+
+    return models
+
+
+def _validate_csp_input_shape(
+    csp: CSP,
+    n_channels: int,
+    condition: str,
+) -> None:
+    filters = getattr(
+        csp,
+        "filters_",
+        None,
+    )
+
+    if filters is None:
+        raise ValueError(
+            f"Saved CSP model for {condition} is missing fitted filters."
+        )
+
+    if filters.shape[1] != n_channels:
+        raise ValueError(
+            f"Saved CSP model for {condition} has incompatible channel "
+            f"count. Expected {n_channels}, found {filters.shape[1]}."
+        )
 
 
 def train_or_load_csp_lda_time_window(

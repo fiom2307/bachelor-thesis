@@ -13,8 +13,12 @@ RESULTS_DIR = ROOT_DIR / "results"
 
 EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
 EEGNET_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "eegnet_time_window"
+EEGNET_CHANNEL_ABLATION_MODEL_DIR = MODEL_DIR / "eegnet_channel_ablation"
+EEGNET_ROI_ABLATION_MODEL_DIR = MODEL_DIR / "eegnet_roi_ablation"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
 CSP_LDA_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "csp_lda_time_window"
+CSP_LDA_CHANNEL_ABLATION_MODEL_DIR = MODEL_DIR / "csp_lda_channel_ablation"
+CSP_LDA_ROI_ABLATION_MODEL_DIR = MODEL_DIR / "csp_lda_roi_ablation"
 CSP_LDA_N_COMPONENTS_MODEL_DIR = MODEL_DIR / "csp_lda_n_components"
 CSP_SVM_MODEL_DIR = MODEL_DIR / "csp_svm"
 
@@ -29,6 +33,7 @@ STATISTICAL_ANALYSIS_DIR = RESULTS_DIR / "statistical_analysis"
 CSP_LDA_EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "csp_lda_experiments"
 EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "experiments"
 EXPERIMENT_MODEL_DIR = MODEL_DIR / "experiments"
+SPATIAL_ABLATION_RESULTS_DIR = RESULTS_DIR / "spatial_ablation"
 
 
 TrialSelection = Literal[
@@ -328,6 +333,28 @@ def get_csp_lda_n_components_subject_dir(
     )
 
 
+def get_csp_lda_channel_ablation_subject_dir(
+    subject: int,
+    condition: str,
+) -> Path:
+    return _create_directory(
+        CSP_LDA_CHANNEL_ABLATION_MODEL_DIR
+        / condition
+        / get_subject_name(subject)
+    )
+
+
+def get_csp_lda_roi_ablation_subject_dir(
+    subject: int,
+    condition: str,
+) -> Path:
+    return _create_directory(
+        CSP_LDA_ROI_ABLATION_MODEL_DIR
+        / condition
+        / get_subject_name(subject)
+    )
+
+
 def get_csp_svm_subject_dir(
     subject: int,
 ) -> Path:
@@ -404,6 +431,38 @@ def get_csp_n_components_fold_model_path(
     )
 
 
+def get_csp_channel_ablation_fold_model_path(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return (
+        get_csp_lda_channel_ablation_subject_dir(
+            subject,
+            condition,
+        )
+        / f"{subject_name}_csp_fold{fold}.joblib"
+    )
+
+
+def get_csp_roi_ablation_fold_model_path(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return (
+        get_csp_lda_roi_ablation_subject_dir(
+            subject,
+            condition,
+        )
+        / f"{subject_name}_csp_fold{fold}.joblib"
+    )
+
+
 def get_lda_fold_model_path(
     subject: int,
     fold: int,
@@ -468,6 +527,38 @@ def get_lda_n_components_fold_model_path(
     )
 
 
+def get_lda_channel_ablation_fold_model_path(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return (
+        get_csp_lda_channel_ablation_subject_dir(
+            subject,
+            condition,
+        )
+        / f"{subject_name}_lda_fold{fold}.joblib"
+    )
+
+
+def get_lda_roi_ablation_fold_model_path(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return (
+        get_csp_lda_roi_ablation_subject_dir(
+            subject,
+            condition,
+        )
+        / f"{subject_name}_lda_fold{fold}.joblib"
+    )
+
+
 def get_svm_fold_model_path(
     subject: int,
     fold: int,
@@ -523,6 +614,28 @@ def get_eegnet_time_window_subject_dir(
     )
 
 
+def get_eegnet_channel_ablation_subject_dir(
+    subject: int,
+    condition: str,
+) -> Path:
+    return _create_directory(
+        EEGNET_CHANNEL_ABLATION_MODEL_DIR
+        / condition
+        / get_subject_name(subject)
+    )
+
+
+def get_eegnet_roi_ablation_subject_dir(
+    subject: int,
+    condition: str,
+) -> Path:
+    return _create_directory(
+        EEGNET_ROI_ABLATION_MODEL_DIR
+        / condition
+        / get_subject_name(subject)
+    )
+
+
 def get_eegnet_fold_model_path(
     subject: int,
     fold: int,
@@ -569,6 +682,38 @@ def get_eegnet_time_window_fold_model_path(
             tmax,
         )
         / filename
+    )
+
+
+def get_eegnet_channel_ablation_fold_model_path(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return (
+        get_eegnet_channel_ablation_subject_dir(
+            subject,
+            condition,
+        )
+        / f"{subject_name}_eegnet_fold{fold}.keras"
+    )
+
+
+def get_eegnet_roi_ablation_fold_model_path(
+    subject: int,
+    fold: int,
+    condition: str,
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    return (
+        get_eegnet_roi_ablation_subject_dir(
+            subject,
+            condition,
+        )
+        / f"{subject_name}_eegnet_fold{fold}.keras"
     )
 
 
@@ -1061,6 +1206,38 @@ def get_channel_statistical_analysis_dir() -> Path:
     return _create_directory(
         STATISTICAL_ANALYSIS_DIR
         / "channel"
+    )
+
+
+def get_channel_statistical_profiles_path() -> Path:
+    """
+    Return the legacy subject-level channel profile CSV path.
+    """
+    return (
+        get_channel_statistical_analysis_dir()
+        / "channel_relevance_profiles.csv"
+    )
+
+
+def get_channel_statistical_results_path() -> Path:
+    """
+    Return the legacy per-channel statistical test CSV path.
+    """
+    return (
+        get_channel_statistical_analysis_dir()
+        / "channel_relevance_statistics.csv"
+    )
+
+
+def get_channel_statistical_comparison_plot_path(
+    comparison_slug: str,
+) -> Path:
+    """
+    Return one legacy channel statistical comparison plot path.
+    """
+    return (
+        get_channel_statistical_analysis_dir()
+        / f"{comparison_slug}.png"
     )
 
 

@@ -262,7 +262,7 @@ def plot_temporal_relevance(
     figure.suptitle(
         _build_title(
             base_title=(
-                "EEGNet temporal SHAP relevance"
+                "EEGNet temporal relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,
@@ -520,7 +520,7 @@ def plot_frequency_relevance(
     figure.suptitle(
         _build_title(
             base_title=(
-                "EEGNet frequency-domain SHAP relevance"
+                "EEGNet frequency relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,
@@ -772,13 +772,13 @@ def plot_channel_relevance(
     )
 
     axis.set_ylabel(
-        "Motor-imagery class"
+        "Motor imagery class"
     )
 
     figure.suptitle(
         _build_title(
             base_title=(
-                "Class-wise EEG channel SHAP relevance"
+                "EEGNet spatial relevance"
             ),
             trial_selection=trial_selection,
             subject=subject,

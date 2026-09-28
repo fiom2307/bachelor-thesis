@@ -1,5 +1,8 @@
 import numpy as np
-from mne import Epochs
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mne import Epochs
 
 
 CLASS_NAME_TO_LABEL = {
@@ -21,7 +24,7 @@ CLASS_NAMES = tuple(
 )
 
 
-def get_train_labels(epochs: Epochs) -> np.ndarray:
+def get_train_labels(epochs: "Epochs") -> np.ndarray:
     """
     Convert the training epoch event codes into zero-based class labels.
 

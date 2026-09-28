@@ -14,15 +14,7 @@ if str(ROOT_DIR) not in sys.path:
         str(ROOT_DIR),
     )
 
-from src.data.dataset import get_data_for_subject
-from src.data.labels import CLASS_LABELS
-from src.pipelines.comparison_pipeline import evaluate_models_for_subject
-from src.pipelines.csp_lda_pipeline import (
-    evaluate_csp_lda_time_window_for_subject,
-)
-from src.pipelines.eegnet_pipeline import (
-    evaluate_eegnet_time_window_for_subject,
-)
+from src.data.labels import CLASS_LABELS, CLASS_NAME_TO_LABEL
 from src.utils.config import BASE_SEED
 from src.utils.paths import ACCURACY_RESULTS_DIR, get_subject_name
 
@@ -30,12 +22,7 @@ from src.utils.paths import ACCURACY_RESULTS_DIR, get_subject_name
 MODEL_CSP_LDA = "CSP+LDA"
 MODEL_EEGNET = "EEGNet"
 
-CLASS_COLUMNS = {
-    "left_hand": 0,
-    "right_hand": 1,
-    "feet": 2,
-    "tongue": 3,
-}
+CLASS_COLUMNS = CLASS_NAME_TO_LABEL
 
 # The three temporal conditions are the original full-window baseline,
 # removal of early information, and removal of late information.
@@ -52,6 +39,10 @@ RESULTS_PATH = (
 DELTAS_PATH = (
     ACCURACY_RESULTS_DIR
     / f"seed_{BASE_SEED}_temporal_ablation_deltas.csv"
+)
+EXTENDED_SUMMARY_PATH = (
+    ACCURACY_RESULTS_DIR
+    / f"seed_{BASE_SEED}_temporal_ablation_class_recall_summary.csv"
 )
 
 
@@ -77,7 +68,26 @@ class TemporalAblationDelta:
     tmin: float
     tmax: float
     accuracy_drop: float
+    left_hand_recall_drop: float
     right_hand_recall_drop: float
+    feet_recall_drop: float
+    tongue_recall_drop: float
+
+
+@dataclass(frozen=True)
+class TemporalAblationSummary:
+    model: str
+    condition: str
+    accuracy: float
+    delta_accuracy: float
+    left_hand_recall: float
+    delta_left_hand_recall: float
+    right_hand_recall: float
+    delta_right_hand_recall: float
+    feet_recall: float
+    delta_feet_recall: float
+    tongue_recall: float
+    delta_tongue_recall: float
 
 
 def main() -> None:
@@ -94,14 +104,16 @@ def main() -> None:
         deltas,
         DELTAS_PATH,
     )
-    print_summary(
+    summary = summarize_temporal_ablation_results(
         results,
-        deltas,
     )
+    save_extended_summary(summary, EXTENDED_SUMMARY_PATH)
+    print_summary(summary)
 
     print()
     print(f"Saved temporal ablation results: {RESULTS_PATH}")
     print(f"Saved temporal ablation deltas: {DELTAS_PATH}")
+    print(f"Saved temporal ablation class-recall summary: {EXTENDED_SUMMARY_PATH}")
 
 
 def run_temporal_ablation_experiment() -> list[TemporalAblationResult]:
@@ -138,6 +150,8 @@ def run_temporal_ablation_experiment() -> list[TemporalAblationResult]:
 def _evaluate_baseline_condition(
     subject: int,
 ) -> list[TemporalAblationResult]:
+    from src.pipelines.comparison_pipeline import evaluate_models_for_subject
+
     evaluation = evaluate_models_for_subject(
         subject
     )
@@ -185,6 +199,14 @@ def _evaluate_baseline_condition(
 def _evaluate_ablation_conditions(
     subject: int,
 ) -> list[TemporalAblationResult]:
+    from src.data.dataset import get_data_for_subject
+    from src.pipelines.csp_lda_pipeline import (
+        evaluate_csp_lda_time_window_for_subject,
+    )
+    from src.pipelines.eegnet_pipeline import (
+        evaluate_eegnet_time_window_for_subject,
+    )
+
     results = []
 
     for condition in ("no_early", "no_late"):
@@ -288,9 +310,21 @@ def compute_temporal_ablation_deltas(
                             baseline.accuracy
                             - ablation.accuracy
                         ),
+                        left_hand_recall_drop=(
+                            baseline.left_hand_recall
+                            - ablation.left_hand_recall
+                        ),
                         right_hand_recall_drop=(
                             baseline.right_hand_recall
                             - ablation.right_hand_recall
+                        ),
+                        feet_recall_drop=(
+                            baseline.feet_recall
+                            - ablation.feet_recall
+                        ),
+                        tongue_recall_drop=(
+                            baseline.tongue_recall
+                            - ablation.tongue_recall
                         ),
                     )
                 )
@@ -367,7 +401,10 @@ def save_deltas(
                 "tmin",
                 "tmax",
                 "accuracy_drop",
+                "left_hand_recall_drop",
                 "right_hand_recall_drop",
+                "feet_recall_drop",
+                "tongue_recall_drop",
             ],
         )
         writer.writeheader()
@@ -380,29 +417,40 @@ def save_deltas(
                 "tmin": _format_float(row.tmin),
                 "tmax": _format_float(row.tmax),
                 "accuracy_drop": _format_float(row.accuracy_drop),
+                "left_hand_recall_drop": _format_float(
+                    row.left_hand_recall_drop
+                ),
                 "right_hand_recall_drop": _format_float(
                     row.right_hand_recall_drop
+                ),
+                "feet_recall_drop": _format_float(row.feet_recall_drop),
+                "tongue_recall_drop": _format_float(
+                    row.tongue_recall_drop
                 ),
             })
 
 
-def print_summary(
+def summarize_temporal_ablation_results(
     results: list[TemporalAblationResult],
-    deltas: list[TemporalAblationDelta],
-) -> None:
-    delta_by_model_condition = {
-        (row.model, row.condition): row
-        for row in _mean_deltas_by_model_condition(deltas)
-    }
-
-    print()
-    print(
-        "Model       Condition    Accuracy    RH Recall    "
-        "Accuracy Drop    RH Recall Drop"
-    )
-    print("-" * 75)
+) -> list[TemporalAblationSummary]:
+    baseline_by_model = {}
+    summary = []
 
     for model in (MODEL_CSP_LDA, MODEL_EEGNET):
+        baseline_rows = [
+            row
+            for row in results
+            if row.model == model and row.condition == "baseline"
+        ]
+        if not baseline_rows:
+            continue
+
+        baseline_by_model[model] = _mean_result_row(
+            model,
+            "baseline",
+            baseline_rows,
+        )
+
         for condition in ("baseline", "no_early", "no_late"):
             condition_rows = [
                 row
@@ -413,34 +461,130 @@ def print_summary(
             if not condition_rows:
                 continue
 
-            accuracy = _mean(
-                [row.accuracy for row in condition_rows]
+            row = _mean_result_row(
+                model,
+                condition,
+                condition_rows,
             )
-            right_hand_recall = _mean(
-                [row.right_hand_recall for row in condition_rows]
-            )
-            delta = delta_by_model_condition.get(
-                (model, condition)
-            )
-            accuracy_drop = (
-                "-"
-                if delta is None
-                else _format_float(delta.accuracy_drop)
-            )
-            right_hand_recall_drop = (
-                "-"
-                if delta is None
-                else _format_float(delta.right_hand_recall_drop)
+            baseline = baseline_by_model[model]
+            summary.append(
+                TemporalAblationSummary(
+                    model=model,
+                    condition=condition,
+                    accuracy=row.accuracy,
+                    delta_accuracy=row.accuracy - baseline.accuracy,
+                    left_hand_recall=row.left_hand_recall,
+                    delta_left_hand_recall=(
+                        row.left_hand_recall
+                        - baseline.left_hand_recall
+                    ),
+                    right_hand_recall=row.right_hand_recall,
+                    delta_right_hand_recall=(
+                        row.right_hand_recall
+                        - baseline.right_hand_recall
+                    ),
+                    feet_recall=row.feet_recall,
+                    delta_feet_recall=(
+                        row.feet_recall
+                        - baseline.feet_recall
+                    ),
+                    tongue_recall=row.tongue_recall,
+                    delta_tongue_recall=(
+                        row.tongue_recall
+                        - baseline.tongue_recall
+                    ),
+                )
             )
 
-            print(
-                f"{model:<11}"
-                f"{_format_condition(condition):<13}"
-                f"{accuracy:>8.4f}    "
-                f"{right_hand_recall:>8.4f}    "
-                f"{accuracy_drop:>13}    "
-                f"{right_hand_recall_drop:>14}"
-            )
+    return summary
+
+
+def save_extended_summary(
+    summary: list[TemporalAblationSummary],
+    output_path: Path,
+) -> None:
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    with output_path.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "model",
+                "condition",
+                "accuracy",
+                "delta_accuracy",
+                "left_hand_recall",
+                "delta_left_hand_recall",
+                "right_hand_recall",
+                "delta_right_hand_recall",
+                "feet_recall",
+                "delta_feet_recall",
+                "tongue_recall",
+                "delta_tongue_recall",
+            ],
+        )
+        writer.writeheader()
+
+        for row in summary:
+            writer.writerow({
+                "model": row.model,
+                "condition": _format_condition(row.condition),
+                "accuracy": _format_float(row.accuracy),
+                "delta_accuracy": _format_float(row.delta_accuracy),
+                "left_hand_recall": _format_float(row.left_hand_recall),
+                "delta_left_hand_recall": _format_float(
+                    row.delta_left_hand_recall
+                ),
+                "right_hand_recall": _format_float(
+                    row.right_hand_recall
+                ),
+                "delta_right_hand_recall": _format_float(
+                    row.delta_right_hand_recall
+                ),
+                "feet_recall": _format_float(row.feet_recall),
+                "delta_feet_recall": _format_float(
+                    row.delta_feet_recall
+                ),
+                "tongue_recall": _format_float(row.tongue_recall),
+                "delta_tongue_recall": _format_float(
+                    row.delta_tongue_recall
+                ),
+            })
+
+
+def print_summary(
+    summary: list[TemporalAblationSummary],
+) -> None:
+    print()
+    print(
+        "Model       Condition   Accuracy   Delta Acc   "
+        "LH Recall  Delta LH   RH Recall  Delta RH   "
+        "Feet Recall  Delta Feet   Tongue Recall  Delta Tongue"
+    )
+    print("-" * 134)
+
+    for row in summary:
+        print(
+            f"{row.model:<11}"
+            f"{_format_condition(row.condition):<12}"
+            f"{row.accuracy:>8.4f}  "
+            f"{row.delta_accuracy:>+9.4f}  "
+            f"{row.left_hand_recall:>9.4f}  "
+            f"{row.delta_left_hand_recall:>+8.4f}  "
+            f"{row.right_hand_recall:>9.4f}  "
+            f"{row.delta_right_hand_recall:>+8.4f}  "
+            f"{row.feet_recall:>11.4f}  "
+            f"{row.delta_feet_recall:>+10.4f}  "
+            f"{row.tongue_recall:>13.4f}  "
+            f"{row.delta_tongue_recall:>+12.4f}"
+        )
 
 
 def _mean_deltas_by_model_condition(
@@ -469,13 +613,49 @@ def _mean_deltas_by_model_condition(
                     accuracy_drop=_mean(
                         [row.accuracy_drop for row in rows]
                     ),
+                    left_hand_recall_drop=_mean(
+                        [row.left_hand_recall_drop for row in rows]
+                    ),
                     right_hand_recall_drop=_mean(
                         [row.right_hand_recall_drop for row in rows]
+                    ),
+                    feet_recall_drop=_mean(
+                        [row.feet_recall_drop for row in rows]
+                    ),
+                    tongue_recall_drop=_mean(
+                        [row.tongue_recall_drop for row in rows]
                     ),
                 )
             )
 
     return mean_rows
+
+
+def _mean_result_row(
+    model: str,
+    condition: str,
+    rows: list[TemporalAblationResult],
+) -> TemporalAblationResult:
+    return TemporalAblationResult(
+        subject="mean",
+        model=model,
+        condition=condition,
+        tmin=rows[0].tmin,
+        tmax=rows[0].tmax,
+        accuracy=_mean([row.accuracy for row in rows]),
+        left_hand_recall=_mean(
+            [row.left_hand_recall for row in rows]
+        ),
+        right_hand_recall=_mean(
+            [row.right_hand_recall for row in rows]
+        ),
+        feet_recall=_mean(
+            [row.feet_recall for row in rows]
+        ),
+        tongue_recall=_mean(
+            [row.tongue_recall for row in rows]
+        ),
+    )
 
 
 def _make_result_row(

@@ -149,7 +149,7 @@ def plot_csp_channel_relevance(
     )
 
     ax.set_ylabel(
-        "Motor-imagery class"
+        "Motor imagery class"
     )
 
     # ----------------------------------------------------------
@@ -186,7 +186,7 @@ def plot_csp_channel_relevance(
         title_suffix = subject
 
     fig.suptitle(
-        "CSP+LDA channel relevance\n"
+        "CSP+LDA spatial relevance\n"
         f"({title_suffix})",
         fontsize=15,
     )

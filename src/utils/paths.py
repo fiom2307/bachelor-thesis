@@ -24,8 +24,6 @@ CSP_SVM_MODEL_DIR = MODEL_DIR / "csp_svm"
 
 ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
 CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
-SPECTRAL_ANALYSIS_DIR = RESULTS_DIR / "spectral_analysis"
-
 SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
 CSP_PATTERN_ANALYSIS_DIR = RESULTS_DIR / "csp_pattern_analysis"
 STATISTICAL_ANALYSIS_DIR = RESULTS_DIR / "statistical_analysis"
@@ -73,7 +71,6 @@ for directory in (
     CSP_SVM_MODEL_DIR,
     ACCURACY_RESULTS_DIR,
     CONFUSION_MATRIX_RESULTS_DIR,
-    SPECTRAL_ANALYSIS_DIR,
     SHAP_RESULTS_DIR,
     CSP_PATTERN_ANALYSIS_DIR,
     STATISTICAL_ANALYSIS_DIR,
@@ -99,19 +96,6 @@ def _create_directory(
     )
 
     return path
-
-
-def _get_subject_spectral_subdir(
-    subject: int,
-    subdir: str,
-) -> Path:
-    """
-    Return and create a spectral-analysis subdirectory for one subject.
-    """
-    return _create_directory(
-        get_subject_spectral_dir(subject)
-        / subdir
-    )
 
 
 def _get_shap_result_name(
@@ -794,81 +778,6 @@ def get_subject_confusion_matrices_path(
             f"{subject_name}_"
             "confusion_matrices.png"
         )
-    )
-
-
-# ----------------------------------------------------------------------
-# Spectral analysis paths
-# ----------------------------------------------------------------------
-
-def get_subject_spectral_dir(
-    subject: int,
-) -> Path:
-    """
-    Return the spectral-analysis directory for one subject.
-    """
-    return (
-        SPECTRAL_ANALYSIS_DIR
-        / get_subject_name(subject)
-    )
-
-
-def get_erd_topographies_path(
-    subject: int,
-) -> Path:
-    """
-    Return the class-wise ERD/ERS topography figure path.
-    """
-    output_directory = (
-        _get_subject_spectral_subdir(
-            subject,
-            "topographies",
-        )
-    )
-
-    return (
-        output_directory
-        / "classwise_erd_ers.png"
-    )
-
-
-def get_tfr_path(
-    subject: int,
-    channel: str,
-) -> Path:
-    """
-    Return the time-frequency representation figure path.
-    """
-    output_directory = (
-        _get_subject_spectral_subdir(
-            subject,
-            "tfr",
-        )
-    )
-
-    return (
-        output_directory
-        / f"{channel}.png"
-    )
-
-
-def get_psd_path(
-    subject: int,
-    channel: str,
-) -> Path:
-    """
-    Return the power spectral density figure path.
-    """
-    output_directory = (
-        _get_subject_spectral_subdir(
-            subject,
-            "psd",
-        )
-    )
-
-    return (
-        output_directory
-        / f"{channel}.png"
     )
 
 

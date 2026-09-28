@@ -50,12 +50,6 @@ Report the number of rejected and retained trials for each subject:
 python -m scripts.report_rejected_trials
 ```
 
-Generate the ERD/ERS topographies, time-frequency representations, and power spectral density plots:
-
-```powershell
-python -m scripts.plot_spectral_analysis
-```
-
 Compute and generate the EEGNet SHAP relevance plots:
 
 ```powershell

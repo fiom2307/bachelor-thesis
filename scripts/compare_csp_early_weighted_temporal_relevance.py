@@ -34,8 +34,8 @@ from src.data.dataset import get_data_for_subject
 from src.data.labels import CLASS_NAMES
 from src.utils.config import BASE_SEED, EPOCH_TMIN, N_FOLDS
 from src.utils.paths import (
-    MODEL_DIR,
-    RESULTS_DIR,
+    EARLY_WEIGHTED_CSP_RESULTS_DIR,
+    get_early_weighted_csp_fold_model_path,
     get_csp_fold_model_path,
     get_lda_fold_model_path,
     get_subject_name,
@@ -49,17 +49,13 @@ MODEL_ORDER = (MODEL_BASELINE, MODEL_WEIGHTED)
 SELECTION_MAIN = "model_correct"
 SELECTION_SHARED = "shared_correct"
 
-WEIGHTED_MODEL_DIR = MODEL_DIR / "csp_lda_weighted"
 EARLY_START = 0.5
 EARLY_END = 1.5
 EARLY_WEIGHT = 2.0
 
-OUTPUT_DIR = RESULTS_DIR / "temporal_ablation"
-FIGURE_DIR = (
-    RESULTS_DIR
-    / "csp_pattern_analysis"
-    / "temporal_relevance_early_weighted_comparison"
-)
+OUTPUT_DIR = EARLY_WEIGHTED_CSP_RESULTS_DIR / "metrics"
+STATISTICS_DIR = EARLY_WEIGHTED_CSP_RESULTS_DIR / "statistics"
+FIGURE_DIR = EARLY_WEIGHTED_CSP_RESULTS_DIR / "figures"
 
 SUBJECT_VALUES_PATH = (
     OUTPUT_DIR
@@ -78,7 +74,7 @@ CLASSWISE_SUMMARY_PATH = (
     / "csp_baseline_vs_early_weighted_temporal_by_class.csv"
 )
 STATISTICS_PATH = (
-    OUTPUT_DIR
+    STATISTICS_DIR
     / "csp_baseline_vs_early_weighted_temporal_statistics.csv"
 )
 SHARED_OVERALL_SUMMARY_PATH = (
@@ -90,7 +86,7 @@ SHARED_CLASSWISE_SUMMARY_PATH = (
     / "csp_baseline_vs_early_weighted_shared_correct_temporal_by_class.csv"
 )
 SHARED_STATISTICS_PATH = (
-    OUTPUT_DIR
+    STATISTICS_DIR
     / "csp_baseline_vs_early_weighted_shared_correct_temporal_statistics.csv"
 )
 OVERALL_FIGURE_PATH = (
@@ -433,21 +429,18 @@ def _load_baseline_models(
 def _load_weighted_models(
     subject: int,
 ) -> list:
-    subject_name = get_subject_name(
-        subject
-    )
     models = []
 
     for fold in range(1, N_FOLDS + 1):
-        csp_path = (
-            WEIGHTED_MODEL_DIR
-            / subject_name
-            / f"{subject_name}_csp_kfold_seed{BASE_SEED}_fold{fold}.joblib"
+        csp_path = get_early_weighted_csp_fold_model_path(
+            subject,
+            fold,
+            "csp",
         )
-        lda_path = (
-            WEIGHTED_MODEL_DIR
-            / subject_name
-            / f"{subject_name}_lda_kfold_seed{BASE_SEED}_fold{fold}.joblib"
+        lda_path = get_early_weighted_csp_fold_model_path(
+            subject,
+            fold,
+            "lda",
         )
 
         if not (

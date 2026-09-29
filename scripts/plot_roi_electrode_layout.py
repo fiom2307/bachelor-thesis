@@ -8,12 +8,13 @@ from matplotlib.patches import Circle
 import mne
 from mne.channels.layout import _find_topomap_coords
 
+from src.utils.paths import (
+    get_electrode_layout_pdf_path,
+    get_electrode_layout_png_path,
+)
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-OUTPUT_DIR = ROOT_DIR / "figures"
-
-PDF_OUTPUT = OUTPUT_DIR / "roi_electrode_layout.pdf"
-PNG_OUTPUT = OUTPUT_DIR / "roi_electrode_layout.png"
+PDF_OUTPUT = get_electrode_layout_pdf_path()
+PNG_OUTPUT = get_electrode_layout_png_path()
 
 MONTAGE_NAME = "biosemi64"
 SFREQ = 250.0

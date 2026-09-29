@@ -11,27 +11,47 @@ DATA_DIR = ROOT_DIR / "data"
 MODEL_DIR = ROOT_DIR / "models"
 RESULTS_DIR = ROOT_DIR / "results"
 
+MODEL_EXPERIMENTS_DIR = MODEL_DIR / "experiments"
+MODEL_EXPLORATORY_DIR = MODEL_DIR / "exploratory"
+
 EEGNET_MODEL_DIR = MODEL_DIR / "eegnet"
-EEGNET_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "eegnet_time_window"
-EEGNET_CHANNEL_ABLATION_MODEL_DIR = MODEL_DIR / "eegnet_channel_ablation"
-EEGNET_ROI_ABLATION_MODEL_DIR = MODEL_DIR / "eegnet_roi_ablation"
+EEGNET_TIME_WINDOW_MODEL_DIR = MODEL_EXPLORATORY_DIR / "eegnet_time_windows"
+EEGNET_CHANNEL_ABLATION_MODEL_DIR = MODEL_EXPLORATORY_DIR / "channel_ablation" / "eegnet"
+EEGNET_ROI_ABLATION_MODEL_DIR = MODEL_EXPLORATORY_DIR / "roi_ablation" / "eegnet"
 CSP_LDA_MODEL_DIR = MODEL_DIR / "csp_lda"
-CSP_LDA_TIME_WINDOW_MODEL_DIR = MODEL_DIR / "csp_lda_time_window"
-CSP_LDA_CHANNEL_ABLATION_MODEL_DIR = MODEL_DIR / "csp_lda_channel_ablation"
-CSP_LDA_ROI_ABLATION_MODEL_DIR = MODEL_DIR / "csp_lda_roi_ablation"
-CSP_LDA_N_COMPONENTS_MODEL_DIR = MODEL_DIR / "csp_lda_n_components"
+CSP_LDA_TIME_WINDOW_MODEL_DIR = MODEL_EXPLORATORY_DIR / "csp_lda_time_windows"
+CSP_LDA_CHANNEL_ABLATION_MODEL_DIR = MODEL_EXPLORATORY_DIR / "channel_ablation" / "csp_lda"
+CSP_LDA_ROI_ABLATION_MODEL_DIR = MODEL_EXPLORATORY_DIR / "roi_ablation" / "csp_lda"
+CSP_LDA_N_COMPONENTS_MODEL_DIR = MODEL_EXPLORATORY_DIR / "csp_lda_n_components"
 CSP_SVM_MODEL_DIR = MODEL_DIR / "csp_svm"
+SPATIALLY_SMOOTHED_CSP_MODEL_DIR = MODEL_EXPERIMENTS_DIR / "spatially_smoothed_csp"
+EARLY_WEIGHTED_CSP_MODEL_DIR = MODEL_EXPERIMENTS_DIR / "early_weighted_csp"
 
-ACCURACY_RESULTS_DIR = RESULTS_DIR / "accuracies"
-CONFUSION_MATRIX_RESULTS_DIR = RESULTS_DIR / "confusion_matrices"
-SHAP_RESULTS_DIR = RESULTS_DIR / "shap_analysis"
-CSP_PATTERN_ANALYSIS_DIR = RESULTS_DIR / "csp_pattern_analysis"
-STATISTICAL_ANALYSIS_DIR = RESULTS_DIR / "statistical_analysis"
+PERFORMANCE_RESULTS_DIR = RESULTS_DIR / "performance"
+PERFORMANCE_METRICS_DIR = PERFORMANCE_RESULTS_DIR / "metrics"
+PERFORMANCE_FIGURES_DIR = PERFORMANCE_RESULTS_DIR / "figures"
+CONFUSION_MATRIX_RESULTS_DIR = PERFORMANCE_FIGURES_DIR / "confusion_matrices"
 
-CSP_LDA_EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "csp_lda_experiments"
+REPRESENTATION_RESULTS_DIR = RESULTS_DIR / "representations"
+SHAP_RESULTS_DIR = REPRESENTATION_RESULTS_DIR / "eegnet_shap"
+CSP_PATTERN_ANALYSIS_DIR = REPRESENTATION_RESULTS_DIR / "csp"
+ELECTRODE_LAYOUT_RESULTS_DIR = REPRESENTATION_RESULTS_DIR / "electrode_layout"
+
+STATISTICAL_ANALYSIS_DIR = RESULTS_DIR / "statistics"
+SPATIAL_STATISTICAL_ANALYSIS_DIR = STATISTICAL_ANALYSIS_DIR / "spatial"
+
 EXPERIMENT_RESULTS_DIR = RESULTS_DIR / "experiments"
-EXPERIMENT_MODEL_DIR = MODEL_DIR / "experiments"
-SPATIAL_ABLATION_RESULTS_DIR = RESULTS_DIR / "spatial_ablation"
+EXPLORATORY_RESULTS_DIR = RESULTS_DIR / "exploratory"
+SPATIALLY_SMOOTHED_CSP_RESULTS_DIR = EXPERIMENT_RESULTS_DIR / "spatially_smoothed_csp"
+EARLY_WEIGHTED_CSP_RESULTS_DIR = EXPERIMENT_RESULTS_DIR / "early_weighted_csp"
+TEMPORAL_ABLATION_RESULTS_DIR = EXPLORATORY_RESULTS_DIR / "temporal_ablation"
+CHANNEL_ABLATION_RESULTS_DIR = EXPLORATORY_RESULTS_DIR / "channel_ablation"
+ROI_ABLATION_RESULTS_DIR = EXPLORATORY_RESULTS_DIR / "roi_ablation"
+
+# Backward-compatible names for existing source functions.
+ACCURACY_RESULTS_DIR = PERFORMANCE_METRICS_DIR
+EXPERIMENT_MODEL_DIR = MODEL_EXPERIMENTS_DIR
+SPATIAL_ABLATION_RESULTS_DIR = EXPLORATORY_RESULTS_DIR / "spatial_ablation"
 
 
 TrialSelection = Literal[
@@ -65,17 +85,29 @@ CSPPatternPlotType = Literal[
 for directory in (
     EEGNET_MODEL_DIR,
     EEGNET_TIME_WINDOW_MODEL_DIR,
+    EEGNET_CHANNEL_ABLATION_MODEL_DIR,
+    EEGNET_ROI_ABLATION_MODEL_DIR,
     CSP_LDA_MODEL_DIR,
     CSP_LDA_TIME_WINDOW_MODEL_DIR,
+    CSP_LDA_CHANNEL_ABLATION_MODEL_DIR,
+    CSP_LDA_ROI_ABLATION_MODEL_DIR,
     CSP_LDA_N_COMPONENTS_MODEL_DIR,
     CSP_SVM_MODEL_DIR,
+    SPATIALLY_SMOOTHED_CSP_MODEL_DIR,
+    EARLY_WEIGHTED_CSP_MODEL_DIR,
     ACCURACY_RESULTS_DIR,
     CONFUSION_MATRIX_RESULTS_DIR,
     SHAP_RESULTS_DIR,
     CSP_PATTERN_ANALYSIS_DIR,
+    ELECTRODE_LAYOUT_RESULTS_DIR,
     STATISTICAL_ANALYSIS_DIR,
-    CSP_LDA_EXPERIMENT_RESULTS_DIR,
     EXPERIMENT_RESULTS_DIR,
+    EXPLORATORY_RESULTS_DIR,
+    SPATIALLY_SMOOTHED_CSP_RESULTS_DIR,
+    EARLY_WEIGHTED_CSP_RESULTS_DIR,
+    TEMPORAL_ABLATION_RESULTS_DIR,
+    CHANNEL_ABLATION_RESULTS_DIR,
+    ROI_ABLATION_RESULTS_DIR,
     EXPERIMENT_MODEL_DIR,
 ):
     directory.mkdir(
@@ -148,7 +180,7 @@ def _get_shap_values_path(
     )
 
     output_directory = _create_directory(
-        SHAP_RESULTS_DIR / "shap_values"
+        SHAP_RESULTS_DIR / "values"
     )
 
     return (
@@ -566,6 +598,67 @@ def get_svm_fold_model_path(
 
 
 # ----------------------------------------------------------------------
+# Representation-guided experiment model paths
+# ----------------------------------------------------------------------
+
+def _get_experiment_csp_lda_subject_dir(
+    base_dir: Path,
+    subject: int,
+) -> Path:
+    return _create_directory(
+        base_dir / get_subject_name(subject)
+    )
+
+
+def _get_experiment_csp_lda_fold_model_path(
+    base_dir: Path,
+    subject: int,
+    fold: int,
+    model_part: Literal["csp", "lda"],
+) -> Path:
+    subject_name = get_subject_name(subject)
+
+    filename = (
+        f"{subject_name}_{model_part}_kfold_"
+        f"seed{BASE_SEED}_fold{fold}.joblib"
+    )
+
+    return (
+        _get_experiment_csp_lda_subject_dir(
+            base_dir,
+            subject,
+        )
+        / filename
+    )
+
+
+def get_spatially_smoothed_csp_fold_model_path(
+    subject: int,
+    fold: int,
+    model_part: Literal["csp", "lda"],
+) -> Path:
+    return _get_experiment_csp_lda_fold_model_path(
+        SPATIALLY_SMOOTHED_CSP_MODEL_DIR,
+        subject,
+        fold,
+        model_part,
+    )
+
+
+def get_early_weighted_csp_fold_model_path(
+    subject: int,
+    fold: int,
+    model_part: Literal["csp", "lda"],
+) -> Path:
+    return _get_experiment_csp_lda_fold_model_path(
+        EARLY_WEIGHTED_CSP_MODEL_DIR,
+        subject,
+        fold,
+        model_part,
+    )
+
+
+# ----------------------------------------------------------------------
 # EEGNet model paths
 # ----------------------------------------------------------------------
 
@@ -736,11 +829,36 @@ def get_eegnet_time_window_accuracy_results_path() -> Path:
     Return the EEGNet time-window accuracy CSV path.
     """
     return (
-        ACCURACY_RESULTS_DIR
+        _create_directory(
+            EXPLORATORY_RESULTS_DIR
+            / "eegnet_time_windows"
+            / "metrics"
+        )
         / (
             f"seed_{BASE_SEED}_"
             "eegnet_time_windows.csv"
         )
+    )
+
+
+def get_temporal_ablation_results_path() -> Path:
+    return (
+        TEMPORAL_ABLATION_RESULTS_DIR
+        / f"seed_{BASE_SEED}_temporal_ablation_results.csv"
+    )
+
+
+def get_temporal_ablation_deltas_path() -> Path:
+    return (
+        TEMPORAL_ABLATION_RESULTS_DIR
+        / f"seed_{BASE_SEED}_temporal_ablation_deltas.csv"
+    )
+
+
+def get_temporal_ablation_summary_path() -> Path:
+    return (
+        TEMPORAL_ABLATION_RESULTS_DIR
+        / f"seed_{BASE_SEED}_temporal_ablation_class_recall_summary.csv"
     )
 
 
@@ -778,6 +896,20 @@ def get_subject_confusion_matrices_path(
             f"{subject_name}_"
             "confusion_matrices.png"
         )
+    )
+
+
+def get_electrode_layout_png_path() -> Path:
+    return (
+        ELECTRODE_LAYOUT_RESULTS_DIR
+        / "roi_electrode_layout.png"
+    )
+
+
+def get_electrode_layout_pdf_path() -> Path:
+    return (
+        ELECTRODE_LAYOUT_RESULTS_DIR
+        / "roi_electrode_layout.pdf"
     )
 
 
@@ -1113,7 +1245,7 @@ def get_channel_statistical_analysis_dir() -> Path:
     Return the channel statistical analysis directory.
     """
     return _create_directory(
-        STATISTICAL_ANALYSIS_DIR
+        SPATIAL_STATISTICAL_ANALYSIS_DIR
         / "channel"
     )
 
@@ -1155,8 +1287,8 @@ def get_channel_sensorimotor_statistical_analysis_dir() -> Path:
     Return the sensorimotor channel statistical analysis directory.
     """
     return _create_directory(
-        STATISTICAL_ANALYSIS_DIR
-        / "channel_sensorimotor"
+        SPATIAL_STATISTICAL_ANALYSIS_DIR
+        / "sensorimotor"
     )
 
 
@@ -1165,8 +1297,8 @@ def get_channel_entropy_statistical_analysis_dir() -> Path:
     Return the channel entropy statistical analysis directory.
     """
     return _create_directory(
-        STATISTICAL_ANALYSIS_DIR
-        / "channel_entropy"
+        SPATIAL_STATISTICAL_ANALYSIS_DIR
+        / "entropy"
     )
 
 
@@ -1439,7 +1571,11 @@ def get_csp_lda_time_window_accuracy_plot_path() -> Path:
     Return the CSP+LDA time-window accuracy comparison plot path.
     """
     return (
-        CSP_LDA_EXPERIMENT_RESULTS_DIR
+        _create_directory(
+            EXPLORATORY_RESULTS_DIR
+            / "csp_lda_time_windows"
+            / "figures"
+        )
         / "time_window_accuracy_comparison.png"
     )
 
@@ -1449,7 +1585,11 @@ def get_csp_lda_n_components_accuracy_plot_path() -> Path:
     Return the CSP+LDA component-count accuracy comparison plot path.
     """
     return (
-        CSP_LDA_EXPERIMENT_RESULTS_DIR
+        _create_directory(
+            EXPLORATORY_RESULTS_DIR
+            / "csp_lda_n_components"
+            / "figures"
+        )
         / "n_components_accuracy_comparison.png"
     )
 

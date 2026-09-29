@@ -1,5 +1,4 @@
 import csv
-import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,16 +21,14 @@ from src.models.csp_lda import predict_csp_lda, train_csp_lda
 from src.utils.config import BASE_SEED, CSP_N_COMPONENTS, EPOCH_TMIN, N_FOLDS
 from src.utils.cross_validation import get_stratified_folds
 from src.utils.paths import (
-    ACCURACY_RESULTS_DIR,
-    RESULTS_DIR,
-    get_experiment_model_dir,
+    EARLY_WEIGHTED_CSP_RESULTS_DIR,
+    get_early_weighted_csp_fold_model_path,
+    get_results_accuracy_comparison_path,
     get_subject_files,
     get_subject_name,
+    get_temporal_ablation_results_path,
 )
 
-
-EXPERIMENT_NAME = "csp_early_weighted"
-MODEL_NAME = "csp_lda_weighted"
 EARLY_START = 0.5
 EARLY_END = 1.5
 EARLY_WEIGHT = 2.0
@@ -52,20 +49,12 @@ CLASS_DISPLAY_NAMES = {
 }
 
 RESULTS_PATH = (
-    RESULTS_DIR
-    / "temporal_ablation"
+    EARLY_WEIGHTED_CSP_RESULTS_DIR
+    / "metrics"
     / "csp_early_weighted_results.csv"
 )
-BASELINE_RESULTS_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_csp_lda_vs_eegnet.csv"
-)
-BASELINE_RECALL_RESULTS_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_temporal_ablation_results.csv"
-)
-MODEL_DIR = ROOT_DIR / "models" / MODEL_NAME
-LEGACY_MODEL_DIR = get_experiment_model_dir(EXPERIMENT_NAME)
+BASELINE_RESULTS_PATH = get_results_accuracy_comparison_path()
+BASELINE_RECALL_RESULTS_PATH = get_temporal_ablation_results_path()
 
 
 @dataclass(frozen=True)
@@ -219,7 +208,6 @@ def train_or_load_early_weighted_csp_lda(
         y_train,
         seed,
     ):
-        copy_legacy_fold_models_if_available(subject, fold)
         saved_models = load_fold_models(subject, fold)
 
         if saved_models is not None:
@@ -378,42 +366,18 @@ def get_fold_model_paths(
     subject: int,
     fold: int,
 ) -> tuple[Path, Path]:
-    subject_name = get_subject_name(subject)
-    subject_dir = MODEL_DIR / subject_name
-    subject_dir.mkdir(
-        parents=True,
-        exist_ok=True,
+    return (
+        get_early_weighted_csp_fold_model_path(
+            subject,
+            fold,
+            "csp",
+        ),
+        get_early_weighted_csp_fold_model_path(
+            subject,
+            fold,
+            "lda",
+        ),
     )
-
-    csp_path = (
-        subject_dir
-        / f"{subject_name}_csp_kfold_seed{BASE_SEED}_fold{fold}.joblib"
-    )
-    lda_path = (
-        subject_dir
-        / f"{subject_name}_lda_kfold_seed{BASE_SEED}_fold{fold}.joblib"
-    )
-
-    return csp_path, lda_path
-
-
-def get_legacy_fold_model_paths(
-    subject: int,
-    fold: int,
-) -> tuple[Path, Path]:
-    subject_name = get_subject_name(subject)
-    subject_dir = LEGACY_MODEL_DIR / subject_name
-
-    csp_path = (
-        subject_dir
-        / f"{subject_name}_early_weighted_csp_seed{BASE_SEED}_fold{fold}.joblib"
-    )
-    lda_path = (
-        subject_dir
-        / f"{subject_name}_early_weighted_lda_seed{BASE_SEED}_fold{fold}.joblib"
-    )
-
-    return csp_path, lda_path
 
 
 def load_fold_models(
@@ -432,52 +396,6 @@ def load_fold_models(
         return None
 
     return joblib.load(csp_path), joblib.load(lda_path)
-
-
-def copy_legacy_fold_models_if_available(
-    subject: int,
-    fold: int,
-) -> bool:
-    csp_path, lda_path = get_fold_model_paths(
-        subject,
-        fold,
-    )
-    legacy_csp_path, legacy_lda_path = get_legacy_fold_model_paths(
-        subject,
-        fold,
-    )
-
-    if csp_path.exists() and lda_path.exists():
-        return True
-
-    if not (
-        legacy_csp_path.exists()
-        and legacy_lda_path.exists()
-    ):
-        return False
-
-    if csp_path.exists() != lda_path.exists():
-        raise RuntimeError(
-            "Only one weighted model file exists for "
-            f"{get_subject_name(subject)} fold {fold}; refusing to mix "
-            "model caches."
-        )
-
-    shutil.copy2(
-        legacy_csp_path,
-        csp_path,
-    )
-    shutil.copy2(
-        legacy_lda_path,
-        lda_path,
-    )
-    print(
-        f"[COPY] {get_subject_name(subject)} "
-        f"Early-weighted CSP+LDA fold {fold}/{N_FOLDS} "
-        f"to {MODEL_DIR}"
-    )
-
-    return True
 
 
 def save_fold_models(

@@ -26,10 +26,10 @@ from src.data.labels import CLASS_NAMES
 from src.data.preprocessing import BCI_2A_CHANNEL_NAMES
 from src.utils.config import BASE_SEED, N_FOLDS
 from src.utils.paths import (
-    MODEL_DIR,
-    RESULTS_DIR,
+    SPATIALLY_SMOOTHED_CSP_RESULTS_DIR,
     get_csp_fold_model_path,
     get_lda_fold_model_path,
+    get_spatially_smoothed_csp_fold_model_path,
     get_subject_name,
 )
 from src.visualization.common import save_figure
@@ -51,19 +51,19 @@ SUBJECTS = range(1, 10)
 CLASS_ORDER = tuple(CLASS_NAMES)
 
 SOURCE_PERFORMANCE_PATH = (
-    RESULTS_DIR
-    / "spatial_distributed"
+    SPATIALLY_SMOOTHED_CSP_RESULTS_DIR
+    / "metrics"
     / "csp_lda_distributed_results.csv"
 )
-DISTRIBUTED_MODEL_DIR = MODEL_DIR / "csp_lda_distributed"
-RESULTS_OUTPUT_DIR = RESULTS_DIR / "experiments" / "spatially_distributed_csp"
-FIGURE_OUTPUT_DIR = ROOT_DIR / "figures" / "experiments" / "spatially_distributed_csp"
+RESULTS_OUTPUT_DIR = SPATIALLY_SMOOTHED_CSP_RESULTS_DIR / "metrics"
+STATISTICS_OUTPUT_DIR = SPATIALLY_SMOOTHED_CSP_RESULTS_DIR / "statistics"
+FIGURE_OUTPUT_DIR = SPATIALLY_SMOOTHED_CSP_RESULTS_DIR / "figures"
 
 PERFORMANCE_SUMMARY_PATH = RESULTS_OUTPUT_DIR / "performance_summary.csv"
 PER_SUBJECT_PERFORMANCE_PATH = RESULTS_OUTPUT_DIR / "per_subject_performance.csv"
 CLASSWISE_ENTROPY_PATH = RESULTS_OUTPUT_DIR / "classwise_entropy.csv"
 OVERALL_ENTROPY_PATH = RESULTS_OUTPUT_DIR / "overall_entropy.csv"
-ENTROPY_STATISTICS_PATH = RESULTS_OUTPUT_DIR / "entropy_statistics.csv"
+ENTROPY_STATISTICS_PATH = STATISTICS_OUTPUT_DIR / "entropy_statistics.csv"
 TRIAL_COUNTS_PATH = RESULTS_OUTPUT_DIR / "entropy_trial_counts.csv"
 CHANNEL_RELEVANCE_PATH = RESULTS_OUTPUT_DIR / "channel_relevance_profiles.csv"
 
@@ -434,19 +434,18 @@ def load_baseline_models(subject: int) -> list:
 
 
 def load_distributed_models(subject: int) -> list:
-    subject_name = get_subject_name(subject)
     models = []
 
     for fold in range(1, N_FOLDS + 1):
-        csp_path = (
-            DISTRIBUTED_MODEL_DIR
-            / subject_name
-            / f"{subject_name}_csp_kfold_seed{BASE_SEED}_fold{fold}.joblib"
+        csp_path = get_spatially_smoothed_csp_fold_model_path(
+            subject,
+            fold,
+            "csp",
         )
-        lda_path = (
-            DISTRIBUTED_MODEL_DIR
-            / subject_name
-            / f"{subject_name}_lda_kfold_seed{BASE_SEED}_fold{fold}.joblib"
+        lda_path = get_spatially_smoothed_csp_fold_model_path(
+            subject,
+            fold,
+            "lda",
         )
         require_existing_file(csp_path)
         require_existing_file(lda_path)

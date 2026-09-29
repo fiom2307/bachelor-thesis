@@ -22,26 +22,30 @@ from src.models.eegnet import (
     train_or_load_eegnet_channel_ablation,
     train_or_load_eegnet_roi_ablation,
 )
-from src.utils.paths import SPATIAL_ABLATION_RESULTS_DIR, get_subject_name
+from src.utils.paths import (
+    CHANNEL_ABLATION_RESULTS_DIR,
+    ROI_ABLATION_RESULTS_DIR,
+    get_subject_name,
+)
 
 
 MODEL_CSP_LDA = "CSP+LDA"
 MODEL_EEGNET = "EEGNet"
 
 CHANNEL_ABLATION_RESULTS_PATH = (
-    SPATIAL_ABLATION_RESULTS_DIR
+    CHANNEL_ABLATION_RESULTS_DIR
     / "channel_ablation_results.csv"
 )
 CHANNEL_ABLATION_DELTAS_PATH = (
-    SPATIAL_ABLATION_RESULTS_DIR
+    CHANNEL_ABLATION_RESULTS_DIR
     / "channel_ablation_deltas.csv"
 )
 ROI_ABLATION_RESULTS_PATH = (
-    SPATIAL_ABLATION_RESULTS_DIR
+    ROI_ABLATION_RESULTS_DIR
     / "roi_ablation_results.csv"
 )
 ROI_ABLATION_DELTAS_PATH = (
-    SPATIAL_ABLATION_RESULTS_DIR
+    ROI_ABLATION_RESULTS_DIR
     / "roi_ablation_deltas.csv"
 )
 

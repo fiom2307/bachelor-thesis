@@ -28,30 +28,24 @@ from src.models.csp_lda import predict_csp_lda, train_csp_lda
 from src.utils.config import BASE_SEED, CSP_N_COMPONENTS, N_FOLDS
 from src.utils.cross_validation import get_stratified_folds
 from src.utils.paths import (
-    ACCURACY_RESULTS_DIR,
-    MODEL_DIR,
-    RESULTS_DIR,
+    SPATIALLY_SMOOTHED_CSP_RESULTS_DIR,
     get_csp_fold_model_path,
     get_lda_fold_model_path,
+    get_results_accuracy_comparison_path,
+    get_spatially_smoothed_csp_fold_model_path,
     get_subject_name,
+    get_temporal_ablation_results_path,
 )
 
 
 LAMBDA = 1.0
 K_NEIGHBORS = 4
 EEGNET_MEAN_ACCURACY = 0.7054
-MODEL_DIR_DISTRIBUTED = MODEL_DIR / "csp_lda_distributed"
-RESULTS_DIR_DISTRIBUTED = RESULTS_DIR / "spatial_distributed"
+RESULTS_DIR_DISTRIBUTED = SPATIALLY_SMOOTHED_CSP_RESULTS_DIR / "metrics"
 RESULTS_PATH = RESULTS_DIR_DISTRIBUTED / "csp_lda_distributed_results.csv"
 ENTROPY_PATH = RESULTS_DIR_DISTRIBUTED / "csp_lda_distributed_entropy.csv"
-BASELINE_ACCURACY_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_csp_lda_vs_eegnet.csv"
-)
-BASELINE_RECALL_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_temporal_ablation_results.csv"
-)
+BASELINE_ACCURACY_PATH = get_results_accuracy_comparison_path()
+BASELINE_RECALL_PATH = get_temporal_ablation_results_path()
 CLASS_ORDER = (
     "left_hand",
     "right_hand",
@@ -125,7 +119,7 @@ def main() -> None:
     print_class_recall_summary(results)
     print_entropy_summary(entropy_results)
     print()
-    print(f"Saved models: {MODEL_DIR_DISTRIBUTED}")
+    print("Saved models: models/experiments/spatially_smoothed_csp")
     print(f"Saved accuracy/recall results: {RESULTS_PATH}")
     print(f"Saved entropy results: {ENTROPY_PATH}")
 
@@ -484,18 +478,17 @@ def get_fold_model_paths(
     subject: int,
     fold: int,
 ) -> tuple[Path, Path]:
-    subject_name = get_subject_name(subject)
-    subject_dir = MODEL_DIR_DISTRIBUTED / subject_name
-    subject_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
     return (
-        subject_dir
-        / f"{subject_name}_csp_kfold_seed{BASE_SEED}_fold{fold}.joblib",
-        subject_dir
-        / f"{subject_name}_lda_kfold_seed{BASE_SEED}_fold{fold}.joblib",
+        get_spatially_smoothed_csp_fold_model_path(
+            subject,
+            fold,
+            "csp",
+        ),
+        get_spatially_smoothed_csp_fold_model_path(
+            subject,
+            fold,
+            "lda",
+        ),
     )
 
 

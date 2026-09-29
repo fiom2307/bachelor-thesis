@@ -15,8 +15,12 @@ if str(ROOT_DIR) not in sys.path:
     )
 
 from src.data.labels import CLASS_LABELS, CLASS_NAME_TO_LABEL
-from src.utils.config import BASE_SEED
-from src.utils.paths import ACCURACY_RESULTS_DIR, get_subject_name
+from src.utils.paths import (
+    get_subject_name,
+    get_temporal_ablation_deltas_path,
+    get_temporal_ablation_results_path,
+    get_temporal_ablation_summary_path,
+)
 
 
 MODEL_CSP_LDA = "CSP+LDA"
@@ -32,18 +36,9 @@ CONDITIONS = {
     "no_late": (0.5, 2.5),
 }
 
-RESULTS_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_temporal_ablation_results.csv"
-)
-DELTAS_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_temporal_ablation_deltas.csv"
-)
-EXTENDED_SUMMARY_PATH = (
-    ACCURACY_RESULTS_DIR
-    / f"seed_{BASE_SEED}_temporal_ablation_class_recall_summary.csv"
-)
+RESULTS_PATH = get_temporal_ablation_results_path()
+DELTAS_PATH = get_temporal_ablation_deltas_path()
+EXTENDED_SUMMARY_PATH = get_temporal_ablation_summary_path()
 
 
 @dataclass(frozen=True)

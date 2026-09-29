@@ -28,7 +28,7 @@ models/              trained models
 results/             generated results and figures
 ```
 
-`data/`, `models/`, and most of `results/` are ignored by Git.
+`data/`, `models/`, and `results/` are ignored by Git.
 
 ## Setup
 

@@ -11,22 +11,7 @@ __pycache__/
 *.mat
 
 # Generated results
-/results/*
-!/results/experiments/
-/results/experiments/*
-!/results/experiments/spatially_smoothed_csp/
-/results/experiments/spatially_smoothed_csp/*
-!/results/experiments/spatially_smoothed_csp/figures/
-/results/experiments/spatially_smoothed_csp/figures/*
-!/results/experiments/spatially_smoothed_csp/figures/baseline_vs_distributed_channel_entropy.png
-!/results/experiments/spatially_smoothed_csp/figures/baseline_vs_distributed_channel_relevance.png
-!/results/experiments/spatially_smoothed_csp/figures/baseline_vs_distributed_overall_channel_entropy.png
-!/results/representations/
-/results/representations/*
-!/results/representations/electrode_layout/
-/results/representations/electrode_layout/*
-!/results/representations/electrode_layout/roi_electrode_layout.pdf
-!/results/representations/electrode_layout/roi_electrode_layout.png
+/results/
 
 # Saved trained models
 /models/

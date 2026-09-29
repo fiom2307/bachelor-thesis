@@ -1,40 +1,38 @@
 # Motor Imagery EEG Representation Analysis
 
-Code for the Bachelor's thesis:
-
-> A Comparative Analysis of Learned Representations in Motor Imagery EEG Decoders with XAI
-
-The repository compares CSP+LDA, EEGNet, and an additional CSP+SVM baseline on BCI Competition IV Dataset 2a, then analyzes spatial, temporal, and frequency relevance patterns.
+CSP+LDA and EEGNet comparison on BCI Competition IV Dataset 2a, including spatial, temporal, and frequency representation analysis. CSP+SVM is included as an additional baseline.
 
 ## Repository Structure
 
 ```text
 src/
-  data/              preprocessing, loading, labels, dataset access
-  models/            model implementations and train/load wrappers
-  pipelines/         subject-level evaluation pipelines
-  analysis/          reusable relevance/statistical analysis code
-  visualization/     plotting helpers
-  utils/             shared config, paths, result helpers
+  data/              preprocessing and dataset loading
+  models/            model implementations
+  pipelines/         evaluation pipelines
+  analysis/
+    csp_pattern_analysis/  
+    shap_analysis/         
+    statistics/            
+    exploratory/           
+  visualization/     plotting functions
+  utils/             configuration, paths, and shared utilities
 
-scripts/             runnable entry points
-data/                local BCI IV 2a files, ignored by Git
-models/              generated trained model caches, ignored by Git
-results/             generated metrics, statistics, and figures
+scripts/
+  main/              model evaluation and representation analysis
+  statistics/        statistical tests
+  experiments/       representation-guided experiments
+  exploratory/       additional experiments
+
+data/                BCI Competition IV Dataset 2a
+models/              trained models
+results/             generated results and figures
 ```
 
-Generated artifacts are organized under:
-
-- `models/csp_lda`, `models/eegnet`, `models/csp_svm`
-- `models/experiments/{spatially_smoothed_csp,early_weighted_csp}`
-- `models/exploratory/...`
-- `results/performance`, `results/representations`, `results/statistics`
-- `results/experiments/{spatially_smoothed_csp,early_weighted_csp}`
-- `results/exploratory/...`
+`data/`, `models/`, and most of `results/` are ignored by Git.
 
 ## Setup
 
-This project was developed with Python 3.12.4.
+The project was developed with Python 3.12.4.
 
 ```powershell
 python -m venv .venv
@@ -54,54 +52,47 @@ data/A09E.gdf
 data/A09E.mat
 ```
 
-The `data/`, generated `models/`, and generated `results/` folders are local artifacts and are ignored by Git, except for selected thesis figures kept under `results/`.
+## Running the Code
 
-## Main Execution Order
-
-Run the main model comparison:
+### Model evaluation
 
 ```powershell
-python -m scripts.compare_model_accuracies
-python -m scripts.compare_model_accuracies_with_svm
+python -m scripts.main.compare_model_accuracies
+python -m scripts.main.compare_model_accuracies_with_svm
+python -m scripts.main.plot_confusion_matrices
+python -m scripts.main.print_classification_reports
+python -m scripts.main.report_rejected_trials
 ```
 
-Generate performance outputs:
+### Representation analysis
 
 ```powershell
-python -m scripts.plot_confusion_matrices
-python -m scripts.print_classification_reports
-python -m scripts.report_rejected_trials
+python -m scripts.main.plot_csp_pattern_analysis
+python -m scripts.main.plot_shap_analysis
 ```
 
-Generate representation analyses:
+### Statistical analysis
 
 ```powershell
-python -m scripts.plot_csp_pattern_analysis
-python -m scripts.plot_shap_analysis
+python -m scripts.statistics.run_performance_statistical_analysis
+python -m scripts.statistics.run_channel_statistical_analysis
+python -m scripts.statistics.run_channel_sensorimotor_statistical_analysis
+python -m scripts.statistics.run_channel_entropy_statistical_analysis
+python -m scripts.statistics.run_temporal_statistical_analysis
+python -m scripts.statistics.run_frequency_statistical_analysis
 ```
 
-Run statistical analyses:
+### Representation-guided experiments
 
 ```powershell
-python -m scripts.run_performance_statistical_analysis
-python -m scripts.run_channel_statistical_analysis
-python -m scripts.run_channel_sensorimotor_statistical_analysis
-python -m scripts.run_channel_entropy_statistical_analysis
-python -m scripts.run_temporal_statistical_analysis
-python -m scripts.run_frequency_statistical_analysis
+python -m scripts.experiments.csp_spatially_distributed
+python -m scripts.experiments.compare_spatially_distributed_csp
+python -m scripts.experiments.csp_early_weighted
+python -m scripts.experiments.compare_csp_early_weighted_temporal_relevance
 ```
 
-Run the two final representation-guided experiments:
+Additional experiments are available in `scripts/exploratory/`, including the CSP and EEGNet time-window experiments, CSP component comparison, channel and ROI ablations, and temporal ablation.
 
-```powershell
-python -m scripts.csp_spatially_distributed
-python -m scripts.compare_spatially_distributed_csp
-python -m scripts.csp_early_weighted
-python -m scripts.compare_csp_early_weighted_temporal_relevance
-```
+## EEGNet
 
-Exploratory scripts include the CSP/EEGNet time-window comparisons, CSP component-count comparison, channel/ROI ablations, and temporal ablation experiment.
-
-## Notes
-
-`src/models/EEGModels.py` identifies itself as `ARL_EEGModels`, a Keras/TensorFlow collection of EEG CNN models. It is used here for the EEGNet implementation and retains the license/provenance text included in that file.
+The EEGNet implementation uses `src/models/EEGModels.py` from the `ARL_EEGModels` collection. The original provenance and license information are retained in the file.

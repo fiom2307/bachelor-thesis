@@ -8,7 +8,7 @@ import numpy as np
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-from src.analysis.channel_statistical_analysis import (
+from src.analysis.statistics.spatial_channel import (
     ALPHA,
     CHANNEL_NAMES,
     COMPARISONS,

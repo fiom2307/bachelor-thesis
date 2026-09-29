@@ -1,4 +1,4 @@
-from src.analysis.channel_statistical_analysis import (
+from src.analysis.statistics.spatial_channel import (
     COMPARISONS,
     ChannelStatisticRow,
 )

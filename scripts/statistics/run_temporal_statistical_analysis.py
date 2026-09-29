@@ -10,7 +10,7 @@ if str(ROOT_DIR) not in sys.path:
         str(ROOT_DIR),
     )
 
-from src.analysis.temporal_statistical_analysis import (
+from src.analysis.statistics.temporal import (
     COMPARISONS,
     run_temporal_statistical_analysis,
 )

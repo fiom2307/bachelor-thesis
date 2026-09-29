@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from sklearn.metrics import accuracy_score
 
-from src.analysis.performance_statistical_analysis import (
+from src.analysis.statistics.performance import (
     _load_subject_predictions,
 )
 from src.data.dataset import get_data_for_subject

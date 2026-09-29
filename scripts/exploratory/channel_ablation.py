@@ -10,7 +10,7 @@ if str(ROOT_DIR) not in sys.path:
         str(ROOT_DIR),
     )
 
-from src.analysis.spatial_ablation import run_channel_ablation
+from src.analysis.exploratory.spatial_ablation import run_channel_ablation
 
 
 def main() -> None:

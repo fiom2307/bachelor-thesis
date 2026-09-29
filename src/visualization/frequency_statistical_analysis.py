@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.analysis.frequency_statistical_analysis import (
+from src.analysis.statistics.frequency import (
     COMPARISONS,
     FrequencyStatisticRow,
 )

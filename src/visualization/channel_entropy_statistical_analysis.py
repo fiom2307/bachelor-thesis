@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from src.analysis.channel_entropy_statistical_analysis import (
+from src.analysis.statistics.spatial_entropy import (
     ChannelEntropyStatisticRow,
 )
-from src.analysis.channel_statistical_analysis import COMPARISONS
+from src.analysis.statistics.spatial_channel import COMPARISONS
 from src.data.labels import CLASS_NAMES
 from src.utils.paths import (
     get_channel_entropy_statistical_classwise_plot_path,

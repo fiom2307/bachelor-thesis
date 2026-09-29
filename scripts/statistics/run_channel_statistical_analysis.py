@@ -10,7 +10,7 @@ if str(ROOT_DIR) not in sys.path:
         str(ROOT_DIR),
     )
 
-from src.analysis.channel_statistical_analysis import (
+from src.analysis.statistics.spatial_channel import (
     COMPARISONS,
     run_channel_statistical_analysis,
 )

@@ -10,10 +10,10 @@ if str(ROOT_DIR) not in sys.path:
         str(ROOT_DIR),
     )
 
-from src.analysis.channel_sensorimotor_statistical_analysis import (
+from src.analysis.statistics.spatial_sensorimotor import (
     run_channel_sensorimotor_statistical_analysis,
 )
-from src.analysis.channel_statistical_analysis import COMPARISONS
+from src.analysis.statistics.spatial_channel import COMPARISONS
 from src.utils.paths import (
     get_channel_sensorimotor_statistical_classwise_results_path,
     get_channel_sensorimotor_statistical_overall_results_path,

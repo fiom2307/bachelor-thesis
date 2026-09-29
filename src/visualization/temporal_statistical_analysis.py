@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.analysis.temporal_statistical_analysis import (
+from src.analysis.statistics.temporal import (
     COMPARISONS,
     TemporalStatisticRow,
 )

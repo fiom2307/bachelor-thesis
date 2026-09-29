@@ -14,8 +14,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.analysis.channel_entropy_statistical_analysis import _normalized_entropy
-from src.analysis.channel_statistical_analysis import _relative_class_profiles
+from src.analysis.statistics.spatial_entropy import _normalized_entropy
+from src.analysis.statistics.spatial_channel import _relative_class_profiles
 from src.analysis.csp_pattern_analysis.channel_relevance import (
     aggregate_trial_channel_relevance,
     compute_trial_channel_relevance,

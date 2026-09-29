@@ -10,7 +10,7 @@ if str(ROOT_DIR) not in sys.path:
         str(ROOT_DIR),
     )
 
-from src.analysis.performance_statistical_analysis import (
+from src.analysis.statistics.performance import (
     run_performance_statistical_analysis,
 )
 from src.utils.paths import (

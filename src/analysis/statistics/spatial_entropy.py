@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.analysis.channel_statistical_analysis import (
+from src.analysis.statistics.spatial_channel import (
     ALPHA,
     COMPARISONS,
     SUBJECTS,

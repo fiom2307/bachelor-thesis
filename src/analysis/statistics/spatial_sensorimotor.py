@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.analysis.channel_statistical_analysis import (
+from src.analysis.statistics.spatial_channel import (
     COMPARISONS,
     ChannelStatisticRow,
     build_subject_roi_profiles,

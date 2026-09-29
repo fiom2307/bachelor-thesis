@@ -119,7 +119,7 @@ def compute_accuracy_statistics() -> PerformanceStatisticRow:
     if results is None:
         raise FileNotFoundError(
             "Accuracy comparison CSV not found. Run "
-            "`python -m scripts.compare_model_accuracies` first."
+            "`python -m scripts.main.compare_model_accuracies` first."
         )
 
     if len(results) != len(list(SUBJECTS)):

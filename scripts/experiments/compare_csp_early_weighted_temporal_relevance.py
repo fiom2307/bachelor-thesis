@@ -17,7 +17,7 @@ from src.analysis.csp_pattern_analysis.temporal_relevance import (
     aggregate_trial_temporal_relevance,
     compute_trial_temporal_relevance,
 )
-from src.analysis.temporal_statistical_analysis import (
+from src.analysis.statistics.temporal import (
     SFREQ,
     SUBJECTS,
     TEMPORAL_WINDOWS,
